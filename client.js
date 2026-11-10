@@ -285,7 +285,7 @@ window.__ModuleLoader__.load({
       '.dsh-csearch-meta{display:flex;align-items:center;gap:6px;color:var(--dsw-alias-label-secondary);font-size:11px}',
       '.dsh-csearch-meta span+span::before{content:"·";margin-right:6px;opacity:.7}',
       '.dsh-csearch-snippet{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;line-height:1.55}',
-      '.dsh-csearch-snippet mark{padding:0 1px;border-radius:2px;background:rgba(74,144,255,.24);background:color-mix(in srgb,var(--dsw-alias-brand-primary) 26%,transparent);color:inherit}',
+      '.dsh-csearch-snippet mark{padding:0 1px;border-radius:2px;background:rgba(255,199,0,.45);color:inherit}',
       '.dsh-csearch-summary{padding:2px 8px 6px;color:var(--dsw-alias-label-secondary);font-size:11px}',
       '.dsh-cg-page{display:flex;flex-direction:column;flex:1 1 auto;height:100%;min-height:0;overflow:hidden;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);font-size:var(--dsh-content-font-size-secondary,13px)}',
       '.dsh-cg-head{flex:none;width:100%;max-width:1080px;margin:0 auto;padding:28px 32px 0;box-sizing:border-box}',
@@ -418,7 +418,7 @@ window.__ModuleLoader__.load({
       '.dsh-cg-para-hits{padding:0 7px;border-radius:999px;background:color-mix(in srgb,var(--dsw-alias-brand-primary) 12%,transparent);color:var(--dsw-alias-brand-primary)}',
       '.dsh-cg-snippet{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:13px;line-height:1.65;overflow-wrap:anywhere}',
       '.dsh-cg-files{display:flex;flex-wrap:wrap;gap:4px}',
-      '.dsh-cg-page mark{padding:0 1px;border-radius:2px;background:rgba(74,144,255,.22);background:color-mix(in srgb,var(--dsw-alias-brand-primary) 24%,transparent);color:inherit}',
+      '.dsh-cg-page mark{padding:0 1px;border-radius:2px;background:rgba(255,199,0,.45);color:inherit}',
       '.dsh-cg-build{margin-left:8px;padding:1px 6px;border-radius:999px;border:.5px solid var(--dsw-alias-border-l1);color:var(--dsw-alias-label-secondary);font-size:11px;font-weight:400;vertical-align:middle}',
       '.dsh-csearch-build{margin-top:6px;padding:1px 6px;border-radius:999px;border:.5px solid var(--dsw-alias-border-l1);color:var(--dsw-alias-label-secondary);font-size:10px;align-self:center}',
       '.dsh-cg-recent{display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;margin-top:12px}',
@@ -427,10 +427,9 @@ window.__ModuleLoader__.load({
       '.dsh-cg-recent-item:hover{border-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-brand-primary)}',
       '.dsh-csearch-files{display:flex;flex-wrap:wrap;gap:4px}',
       '.dsh-csearch-file{max-width:100%;padding:1px 7px;border:.5px solid var(--dsw-alias-border-l1);border-radius:999px;color:var(--dsw-alias-label-secondary);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
-      '::highlight(dsh-chat-search){background-color:rgba(74,144,255,.32);color:inherit}',
+      '::highlight(dsh-chat-search){background-color:rgba(255,199,0,.5);color:inherit}',
       '.dsh-csearch-highlight-layer{position:fixed;inset:0;z-index:900;pointer-events:none;overflow:hidden}',
-      '.dsh-csearch-highlight{position:absolute;border-radius:2px;background:rgba(74,144,255,.3);background:color-mix(in srgb,var(--dsw-alias-brand-primary) 30%,transparent);animation:dsh-csearch-hl-in .16s ease-out}',
-      '@keyframes dsh-csearch-hl-in{from{opacity:0}to{opacity:1}}',
+      '.dsh-csearch-highlight{position:absolute;border-radius:2px;background:rgba(255,199,0,.5)}',
       '.dsh-csearch-results{display:flex;flex-direction:column;gap:2px}',
       '.dsh-csearch-results[data-loading="true"]{opacity:.6}',
       '.dsh-csearch-summary{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 6px 8px;color:var(--dsw-alias-label-secondary);font-size:11px}',
@@ -448,7 +447,7 @@ window.__ModuleLoader__.load({
       '.dsh-csearch-meta{display:flex;align-items:center;gap:6px;color:var(--dsw-alias-label-secondary);font-size:11px}',
       '.dsh-csearch-hits{padding:0 6px;border-radius:999px;background:color-mix(in srgb,var(--dsw-alias-brand-primary) 12%,transparent);color:var(--dsw-alias-brand-primary)}',
       '.dsh-csearch-snippet{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;line-height:1.6;font-size:13px}',
-      '.dsh-csearch-group mark,.dsh-csearch-snippet mark{padding:0 1px;border-radius:2px;background:rgba(74,144,255,.24);background:color-mix(in srgb,var(--dsw-alias-brand-primary) 26%,transparent);color:inherit}',
+      '.dsh-csearch-group mark,.dsh-csearch-snippet mark{padding:0 1px;border-radius:2px;background:rgba(255,199,0,.45);color:inherit}',
       /* The jump indicator: a non-blocking pill, so a click is acknowledged without a modal. */
       '.dsh-cg-jump{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:1200;display:flex;align-items:center;gap:10px;max-width:min(520px,90vw);padding:9px 14px;border:.5px solid var(--dsw-alias-border-l2);border-radius:999px;background:var(--dsw-alias-bg-overlay);box-shadow:0 10px 30px rgba(0,0,0,.16);cursor:progress;pointer-events:none;animation:dsh-cg-mask-in .12s ease-out}',
       '.dsh-cg-mask-text{display:flex;flex-direction:column;gap:1px;min-width:0}',
@@ -1270,6 +1269,19 @@ window.__ModuleLoader__.load({
       detachOverlay()
     }
 
+    /** The ranges painted last, so a replay can tell "still valid" from "a re-render killed them". */
+    let lastPaint = { key: '', ranges: [] }
+
+    function rangesAlive(ranges) {
+      if (ranges.length === 0) return false
+      for (const range of ranges) {
+        const node = range.startContainer
+        if (node === null || node === undefined) return false
+        if (typeof node.isConnected === 'boolean' && !node.isConnected) return false
+      }
+      return true
+    }
+
     /** Mark the matched words in one row: native text highlight when possible, boxes otherwise. */
     function paintHighlight(row, words, scroller) {
       const ranges = wordRanges(row, words)
@@ -1290,6 +1302,7 @@ window.__ModuleLoader__.load({
       } else {
         row.scrollIntoView({ block: 'center', behavior: prefersReducedMotion() ? 'auto' : 'smooth' })
       }
+      return ranges
     }
 
     /** Scroll the conversation to one message and mark the matched words. */
@@ -1300,7 +1313,7 @@ window.__ModuleLoader__.load({
         debugLog('jump: row not rendered', nodeKey)
         return false
       }
-      scrollAndPaint(row, words)
+      lastPaint = { key: nodeKey, ranges: scrollAndPaint(row, words) }
       replayLanding(nodeKey, words)
       return true
     }
@@ -1308,17 +1321,22 @@ window.__ModuleLoader__.load({
     /**
      * Keep the arrival visible while the Chat view settles.
      *
-     * A smooth scroll moves the text out from under boxes painted at the old position, and a
-     * re-render replaces the text nodes the ranges point at, so the marker is repainted a few
-     * times; the last pass leaves it on screen until its own fade-out.
+     * A re-render replaces the text nodes the ranges point at, so the marker is rebuilt a few
+     * times. A pass that finds the previous ranges still attached does nothing at all: repainting
+     * a healthy highlight is what made it look like it was flashing, and re-scrolling on every
+     * pass made the page bounce.
      */
     function replayLanding(nodeKey, words) {
       for (const delay of [120, 400, 900, 1500]) {
         setTimeout(() => {
-          const rows = rowsOf(nodeKey)
-          const row = rows[0]
-          if (row === undefined) return
-          scrollAndPaint(row, words)
+          if (lastPaint.key !== nodeKey || !rangesAlive(lastPaint.ranges)) {
+            const rows = rowsOf(nodeKey)
+            const row = rows[0]
+            if (row === undefined) return
+            /* Only the first pass scrolls; later passes exist for the marker alone. */
+            const ranges = paintHighlight(row, words, scrollerOf(row))
+            lastPaint = { key: nodeKey, ranges }
+          }
         }, delay)
       }
     }

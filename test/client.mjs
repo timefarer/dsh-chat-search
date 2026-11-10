@@ -498,6 +498,16 @@ if (highlightRule === null || highlightRule[1] !== plugin.highlight) {
   process.exit(1)
 }
 
+/* Keyword marks and the arrival marker share one amber, distinct from every row background. */
+if (!/::highlight\(dsh-chat-search\)\{[^}]*rgba\(255,\s*199,\s*0/.test(code)) {
+  console.error('FAIL: the native highlight is not amber')
+  process.exit(1)
+}
+if (!/\.dsh-cg-page mark\{[^}]*rgba\(255,\s*199,\s*0/.test(code)) {
+  console.error('FAIL: page keyword marks are not amber')
+  process.exit(1)
+}
+
 plugin.apply(ctx)
 
 const byName = (name) => registrations.filter((entry) => entry.name === name)
