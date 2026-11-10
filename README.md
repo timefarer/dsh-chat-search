@@ -45,16 +45,26 @@
 
 ## 安装
 
-```powershell
-# 从 npm 安装（先完全退出 DSH）
-dsh plugin --profile desktop add dsh-chat-search
+**应用内安装（推荐）**
 
-# 从本地源码安装（开发用）
-dsh plugin --profile desktop add link:<本目录路径>
+打开 DSH → **插件** 页 → **Add plugin** → 搜索 `dsh-chat-search` → **Install**。
+
+**命令行安装**
+
+```sh
+dsh plugin --profile <profile> add dsh-chat-search
 ```
 
-安装后**完全退出并重新打开 DSH**：宿主半只在进程启动时加载一次，刷新页面不够
-（桌面正式版没有「刷新页面」菜单）。
+`<profile>` 换成你的 profile 名：桌面端一般是 `desktop`，普通 `dsh web` 是 `web`。
+
+**从源码安装（开发用）**
+
+```sh
+dsh plugin --profile <profile> add link:<本目录路径>
+```
+
+> 安装后**完全退出并重新打开 DSH**：Host 半只在进程启动时加载一次，刷新页面不够
+> （桌面正式版没有「刷新页面」菜单）。
 
 ## 使用
 

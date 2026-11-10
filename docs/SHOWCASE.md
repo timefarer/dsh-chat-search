@@ -186,15 +186,18 @@
 
 ## 8. 30 秒上手
 
-```powershell
-# 先完全退出 DSH 应用
-dsh plugin --profile desktop add dsh-chat-search
+**应用内安装（推荐）**：DSH → **插件** 页 → **Add plugin** → 搜索 `dsh-chat-search` → **Install**。
 
-# 或者从本地克隆链接（开发时）
-dsh plugin --profile desktop add link:<本目录>
+**命令行**（`<profile>` 换成你的 profile：桌面端一般是 `desktop`，普通 `dsh web` 是 `web`）：
+
+```sh
+dsh plugin --profile <profile> add dsh-chat-search
+
+# 从源码（开发时）
+dsh plugin --profile <profile> add link:<本目录>
 ```
 
-重启应用（Host 半区只在进程启动时加载一次，刷新页面不够），然后：
+安装后**完全退出并重开 DSH**（Host 半区只在进程启动时加载一次，刷新页面不够），然后：
 
 1. `Ctrl/Cmd+F` → 搜 `高亮` → 点第一条，看它跳过去并标出命中词；
 2. 左栏「全局搜索」→ 搜 `conversation-search` → 打开任意会话行；
