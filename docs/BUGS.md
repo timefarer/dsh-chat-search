@@ -16,6 +16,7 @@
 | B17 | T9 | 高亮区域有边框、且几秒后消失 | 兜底方框带 1px `box-shadow`；落地时给整行加了描边环；高亮设了 4.6s 定时清除 | 去掉方框描边与整行描边环；高亮改为**常驻**，仅在查询变化或关闭会话内检索面板时清除 | ✅ |
 | B14 | T7 | 会话内面板跳转后仍看不到高亮 | 面板路径只调 `jumpToNode` 一次，方框画在**平滑滚动前**的坐标上，滚动后留在旧位置 | `jumpToNode` 内部统一为「立即绘制 + 120/400/900/1500ms 重放」，两条跳转路径共用 | ✅ |
 | B15 | T7 | 长段落（含换行）按锚点匹配失败，退化为就近节点 | 锚点由 Host 归一化（空白折叠），节点文本未归一化，`includes` 对不上 | `nodeTextOf` 同样折叠空白并 trim；锚点匹配限定在目标角色节点内 | ✅ |
+| B18 | T11 | 改名后跳转完全没有高亮，无任何报错 | `HIGHLIGHT` 常量改成 `dsh-chat-search`，但注入的 `::highlight()` 选择器仍写旧名，两者不匹配，高亮「存在但透明」 | 选择器与常量统一；测试新增断言「CSS 选择器 == 插件导出的 highlight 名」 | ✅ |
 | B8 | T7 | 开合会话搜索时内容区展开/收起有卡顿 | 右栏列宽变化导致中央列重排；插件自身在动画期间还有模糊合成、离屏结果布局、整树重渲染 | 移除蒙版 `backdrop-filter`；结果行/会话块 `content-visibility: auto`；全局树记忆化；面板列表保持轻量 | 🟡 宿主列宽动画仍在，只消除了本插件开销 |
 | B9 | 自测 | 无标题会话在结果里显示空白 | 只取 `session/title` 事件 | Host 生成 `displayTitle`（首条提问前 40 字），仅用于展示，不参与会话层匹配 | ✅ |
 | B10 | 自测 | 目标消息未加载时跳转组件空转 | 只在 `key === null` 时补历史，而就近兜底几乎从不返回 null | 未精确命中即补历史，此后每 8 次重试补一次 | ✅ |
@@ -34,7 +35,6 @@
 
 ## 回归验证
 
-- `node --check plugins/conversation-search/client.js` / `index.js`
-- `node _tools/test-conversation-search-client.mjs`
-- `node _tools/test-global-search-host.mjs`
+- `npm run check`（`node --check index.js` / `client.js`）
+- `npm test`（`test/host.mjs` + `test/client.mjs`）
 - 重启插件后确认 `sidebar.panellist`、`main`、`shell.overlay`、标题栏三个座位在册；`POST /conversation-search/api` 无凭据返回 401。

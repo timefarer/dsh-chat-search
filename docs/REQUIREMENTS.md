@@ -30,6 +30,10 @@
 | R23 | T10 | 全局检索对所有会话生效，会话内检索仅对当前会话生效 | ✅ | Host `searchCorpus` 逐会话裁剪；Client `searchConversation` 只看当前会话 |
 | R24 | T10 | 记住筛选范围配置 | ✅ | `plugin-data/conversation-search/filters.json`，两处控件共用 |
 | R25 | T10 | 未说明但必要的设计 | ✅ | 范围摘要、一键重置、修改即重跑、空结果提示、轮次序号保持真实值 |
+| R26 | T11 | 作为独立开源项目发布（GitHub + npm） | ✅ | `dsh-chat-search@1.0.1` 已发布，`dsh plugin add dsh-chat-search` 可用 |
+| R27 | T11 | 被 dsh-market 检索到 | 🟡 | 收录目录 PR [#13785](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/13785) 已提交，等评审合并；合并后站点与市场自动收录 |
+| R28 | T11 | 安装说明要通用，不绑定本机 | ✅ | 应用内「插件 → 添加插件」优先；命令行 `dsh plugin add dsh-chat-search`，指定 profile 时再加 `--profile` |
+| R29 | T11 | 代码与对话工作区分离 | ✅ | 仓库迁到 `deepseek-harness/projects/dsh-chat-search`，profile 从新路径 link 安装 |
 
 ## 需求变更记录
 

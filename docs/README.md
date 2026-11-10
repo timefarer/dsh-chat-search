@@ -17,8 +17,9 @@
 
 ## 当前状态
 
-- 版本：`1.0.0`
-- 包名：`dsh-chat-search`；宿主行 id 仍是 `conversation-search`
+- 版本：`1.0.2`
+- 包名：`dsh-chat-search`（npm 已发布 1.0.1）；宿主行 id 仍是 `conversation-search`
 - 测试：`test/host.mjs`、`test/client.mjs`（`npm test`）
-- 安装：`dsh plugin --profile desktop add dsh-chat-search`，或 `add link:<本目录>`
+- 安装：应用内「插件 → 添加插件」搜 `dsh-chat-search`；或 `dsh plugin add dsh-chat-search`
+- 仓库位置：`deepseek-harness/projects/dsh-chat-search`
 - 已知限制见 [DESIGN.md](./DESIGN.md#13-已知限制) 与 [BUGS.md](./BUGS.md) 中标记为「已知/待办」的条目
