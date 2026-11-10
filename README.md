@@ -7,18 +7,18 @@
 按**段落**与**文件名**匹配，结果按「会话 → 问题 → 段落」三层展开；可用**日期范围**和**每会话轮次**
 收窄范围；点击结果直接跳到具体段落，命中词用浏览器查找式高亮，滚动时跟随。
 
-> 状态：1.0.0，目标 DSH ≥ 0.2.0-rc.1。尽力维护——插件依赖少量未公开的 DOM 锚点与客户端服务，
+> 状态：1.0.1，目标 DSH ≥ 0.2.0-rc.1。尽力维护——插件依赖少量未公开的 DOM 锚点与客户端服务，
 > DSH 升级后可能失效，届时会尽快跟进。
 
 ## 截图
 
 **全局检索**：主内容区整页，范围胶囊 + 筛选窗口 + 会话 → 问题 → 段落三层结果。
 
-![全局检索](docs/global.png)
+![全局检索](https://raw.githubusercontent.com/yhaix/dsh-chat-search/main/docs/global.png)
 
 **会话内检索**：右侧栏面板，按轮次分组，显示命中的段落、文件名与命中次数。
 
-![会话内检索](docs/panel.png)
+![会话内检索](https://raw.githubusercontent.com/yhaix/dsh-chat-search/main/docs/panel.png)
 
 ## 为什么是它
 
