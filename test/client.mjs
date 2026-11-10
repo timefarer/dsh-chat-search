@@ -797,6 +797,7 @@ check(
   String(findAll(scopeTree, 'dsh-csearch-scope').length),
 )
 check('the default scope shows both sides', flatten(scopeTree).join('|').replace(/\|/g, '').includes('我已经调整了侧边栏宽度'))
+check('panel rows advertise the jump', findAll(scopeTree, 'dsh-csearch-go').length > 0)
 
 const scopeChips = findAll(scopeTree, 'dsh-csearch-scope')
 if (scopeChips.length === 3) {

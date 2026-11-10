@@ -317,7 +317,10 @@ window.__ModuleLoader__.load({
       '.dsh-cg-jump-btn:hover{border-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-brand-primary)}',
       '.dsh-cg-legend{padding:0 2px 8px;color:var(--dsw-alias-label-secondary);font-size:11px;opacity:.85}',
       '.dsh-cg-spinner-sm{width:11px;height:11px;border-width:1.5px;margin-right:5px;vertical-align:-1px}',
+      '.dsh-spin{flex:none;color:var(--dsw-alias-brand-primary);animation:dsh-cg-spin .9s linear infinite}',
+      '.dsh-spin{flex:none;color:var(--dsw-alias-brand-primary);animation:dsh-cg-spin .9s linear infinite}',
       '.dsh-cg-pulse{display:inline-flex;align-items:center;color:var(--dsw-alias-brand-primary)}',
+      '.dsh-cg-pill{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:1200;display:flex;align-items:center;gap:10px;max-width:min(520px,90vw);padding:9px 14px;border:.5px solid var(--dsw-alias-border-l2);border-radius:999px;background:var(--dsw-alias-bg-overlay);box-shadow:0 10px 30px rgba(0,0,0,.16);cursor:progress;pointer-events:none;animation:dsh-cg-mask-in .12s ease-out}',
       '.dsh-cg-tree{display:flex;flex-direction:column;gap:8px}',
       '.dsh-cg-session{border:.5px solid var(--dsw-alias-border-l1);border-radius:var(--dsw-radius-md,10px);background:var(--dsw-alias-bg-layer-1);overflow:hidden}',
       '.dsh-cg-session-head{display:flex;align-items:center;gap:8px;padding:8px 10px 8px 8px}',
@@ -401,15 +404,15 @@ window.__ModuleLoader__.load({
       '.dsh-cg-questions{margin:0 8px 6px 20px;padding-left:12px;border-left:1.5px solid var(--dsw-alias-border-l1)}',
       '.dsh-cg-question{border-top:.5px solid var(--dsw-alias-border-l1)}',
       '.dsh-cg-question:first-child{border-top:0}',
-      '.dsh-cg-question-row{display:flex;align-items:center;gap:8px;padding:1px 0}',
+      '.dsh-cg-question-row{display:flex;align-items:center;gap:8px;margin:2px 0;padding:2px 4px;border-radius:9px;background:var(--dsw-alias-bg-layer-2)}',
       '.dsh-cg-question-toggle{display:flex;align-items:center;gap:7px;flex:1;min-width:0;padding:6px;border:0;border-radius:8px;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}',
       '.dsh-cg-question-toggle:hover{background:var(--dsw-alias-bg-layer-2)}',
       '.dsh-cg-question-toggle:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-2px}',
       '.dsh-cg-q-tag{flex:none;color:var(--dsw-alias-brand-primary);font-size:11px;font-weight:600;white-space:nowrap}',
       '.dsh-cg-q-text{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;line-height:1.5}',
       '.dsh-cg-paras{display:flex;flex-direction:column;gap:4px;padding:0 6px 8px}',
-      '.dsh-cg-para{display:flex;flex-direction:column;gap:5px;width:100%;padding:8px 10px;border:.5px solid transparent;border-radius:10px;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer;content-visibility:auto;contain-intrinsic-size:auto 76px}',
-      '.dsh-cg-para:hover{border-color:var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2)}',
+      '.dsh-cg-para{display:flex;flex-direction:column;gap:5px;width:100%;padding:8px 10px;border:.5px solid var(--dsw-alias-border-l1);border-radius:10px;background:var(--dsw-alias-bg-base);color:inherit;font:inherit;text-align:left;cursor:pointer;content-visibility:auto;contain-intrinsic-size:auto 76px}',
+      '.dsh-cg-para:hover{border-color:var(--dsw-alias-brand-primary);background:rgba(74,144,255,.07)}',
       '.dsh-cg-para:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-2px}',
       '.dsh-cg-para-meta{display:flex;align-items:center;gap:7px;color:var(--dsw-alias-label-secondary);font-size:11px}',
       '.dsh-cg-para-hits{padding:0 7px;border-radius:999px;background:color-mix(in srgb,var(--dsw-alias-brand-primary) 12%,transparent);color:var(--dsw-alias-brand-primary)}',
@@ -437,6 +440,9 @@ window.__ModuleLoader__.load({
       '.dsh-csearch-turn{flex:none;color:var(--dsw-alias-brand-primary);font-size:11px;font-weight:600;letter-spacing:.02em}',
       '.dsh-csearch-question{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dsw-alias-label-secondary);font-size:12px}',
       '.dsh-csearch-item{display:flex;flex-direction:column;gap:4px;width:100%;margin:0 0 2px;padding:7px 8px;border:.5px solid transparent;border-radius:9px;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer;content-visibility:auto;contain-intrinsic-size:auto 64px}',
+      '.dsh-csearch-item:hover{background:var(--dsw-alias-bg-layer-2);border-color:var(--dsw-alias-border-l1)}',
+      '.dsh-csearch-go{margin-left:auto;opacity:0;color:var(--dsw-alias-brand-primary);font-size:11px;transition:opacity .12s}',
+      '.dsh-csearch-item:hover .dsh-csearch-go,.dsh-csearch-item:focus-visible .dsh-csearch-go{opacity:1}',
       '.dsh-csearch-item:hover{border-color:var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2)}',
       '.dsh-csearch-item:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-2px}',
       '.dsh-csearch-meta{display:flex;align-items:center;gap:6px;color:var(--dsw-alias-label-secondary);font-size:11px}',
@@ -445,7 +451,6 @@ window.__ModuleLoader__.load({
       '.dsh-csearch-group mark,.dsh-csearch-snippet mark{padding:0 1px;border-radius:2px;background:rgba(74,144,255,.24);background:color-mix(in srgb,var(--dsw-alias-brand-primary) 26%,transparent);color:inherit}',
       /* The jump indicator: a non-blocking pill, so a click is acknowledged without a modal. */
       '.dsh-cg-jump{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:1200;display:flex;align-items:center;gap:10px;max-width:min(520px,90vw);padding:9px 14px;border:.5px solid var(--dsw-alias-border-l2);border-radius:999px;background:var(--dsw-alias-bg-overlay);box-shadow:0 10px 30px rgba(0,0,0,.16);cursor:progress;pointer-events:none;animation:dsh-cg-mask-in .12s ease-out}',
-      '.dsh-cg-spinner{flex:none;width:16px;height:16px;border-radius:50%;border:2px solid color-mix(in srgb,var(--dsw-alias-brand-primary) 25%,transparent);border-top-color:var(--dsw-alias-brand-primary);animation:dsh-cg-spin .8s linear infinite}',
       '.dsh-cg-mask-text{display:flex;flex-direction:column;gap:1px;min-width:0}',
       '.dsh-cg-mask-text strong{font-size:12.5px;font-weight:600;color:var(--dsw-alias-label-primary)}',
       '.dsh-cg-mask-sub{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px;color:var(--dsw-alias-label-secondary)}',
@@ -1675,6 +1680,17 @@ window.__ModuleLoader__.load({
 
     // #region Icons
 
+    /** One inline SVG spinner: border-free, so it renders the same in every host build. */
+    function spinner(size) {
+      const edge = size === 'sm' ? 12 : 16
+      return h(
+        'svg',
+        { className: 'dsh-spin', viewBox: '0 0 24 24', width: edge, height: edge, 'aria-hidden': 'true' },
+        h('circle', { cx: 12, cy: 12, r: 9, fill: 'none', stroke: 'currentColor', strokeWidth: 3, opacity: 0.2 }),
+        h('path', { d: 'M21 12a9 9 0 0 0-9-9', fill: 'none', stroke: 'currentColor', strokeWidth: 3, strokeLinecap: 'round' }),
+      )
+    }
+
     function IconSearch() {
       return h(
         'svg',
@@ -2124,6 +2140,7 @@ window.__ModuleLoader__.load({
                     className: 'dsh-csearch-item',
                     key: item.key + ':' + item.index,
                     'data-csearch-row': '',
+                    title: t('jump.paraHint'),
                     onClick: () => onPick(item, words),
                   },
                   h(
@@ -2134,6 +2151,7 @@ window.__ModuleLoader__.load({
                     typeof item.hits === 'number' && item.hits > 1
                       ? h('span', { className: 'dsh-csearch-hits' }, t('global.paragraph.hits', { count: item.hits }))
                       : null,
+                    h('span', { className: 'dsh-csearch-go', 'aria-hidden': 'true' }, '↗'),
                   ),
                   item.kind === 'file'
                     ? h(
@@ -2723,8 +2741,8 @@ window.__ModuleLoader__.load({
         body = h(
           'div',
           { className: 'dsh-cg-state' },
-          h('span', { className: 'dsh-cg-spinner', 'aria-hidden': 'true' }),
-          h('span', null, refreshing ? t('global.refreshing') : t('global.loading')),
+          spinner(),
+          h('span', null, t('global.loading')),
         )
       } else if (sessions.length === 0) {
         body = h(
@@ -2747,6 +2765,14 @@ window.__ModuleLoader__.load({
       return h(
         'div',
         { className: 'dsh-cg-page' },
+        refreshing
+          ? h(
+              'div',
+              { className: 'dsh-cg-pill', role: 'status', 'aria-live': 'polite' },
+              spinner(),
+              h('div', { className: 'dsh-cg-mask-text' }, h('strong', null, t('global.refreshing'))),
+            )
+          : null,
         h(
           'div',
           { className: 'dsh-cg-head' },
@@ -2837,13 +2863,8 @@ window.__ModuleLoader__.load({
                 h('span', { className: 'dsh-cg-stats-text' }, t('global.indexed', { count: stats.indexed })),
                 h('span', { className: 'dsh-cg-stats-text' }, t('global.scopeHint.' + scope)),
                 h('span', { className: 'dsh-cg-stats-text' }, filtersSummary(t, filters)),
-                status === 'loading'
-                  ? h(
-                      'span',
-                      { className: 'dsh-cg-pulse' },
-                      h('span', { className: 'dsh-cg-spinner dsh-cg-spinner-sm', 'aria-hidden': 'true' }),
-                      refreshing ? t('global.refreshing') : t('global.loading'),
-                    )
+                status === 'loading' && !refreshing
+                  ? h('span', { className: 'dsh-cg-pulse' }, spinner('sm'), t('global.loading'))
                   : null,
                 stats.truncated ? h('span', { className: 'dsh-cg-stats-text' }, t('global.truncated', { count: stats.sessions })) : null,
                 sessions.length === 0
@@ -2874,7 +2895,7 @@ window.__ModuleLoader__.load({
       return h(
         'div',
         { className: 'dsh-cg-jump', role: 'status', 'aria-live': 'polite' },
-        h('span', { className: 'dsh-cg-spinner', 'aria-hidden': 'true' }),
+        spinner(),
         h(
           'div',
           { className: 'dsh-cg-mask-text' },
