@@ -246,6 +246,10 @@ const zh = {
   'filters.summary.range': '{since} ~ {until}',
   'filters.summary.turns': '最近 {count} 轮',
   'filters.summary.all': '全部范围',
+  'panel.scope.label': '检索范围',
+  'panel.scope.all': '全部',
+  'panel.scope.question': '仅问题',
+  'panel.scope.paragraph': '仅段落',
   'global.question.label': '第 {number} 轮',
   'global.question.matched': '问题命中',
   'global.question.empty': '（无提问文本）',
@@ -591,6 +595,11 @@ check(
   JSON.stringify(opened[0] && opened[0].jump),
 )
 check(
+  'jump carries the query and scope for the panel mirror',
+  opened.length === 1 && opened[0].jump.query === '侧边栏' && opened[0].jump.scope === 'all',
+  JSON.stringify(opened[0] && opened[0].jump),
+)
+check(
   'jump carries the text anchor and turn',
   opened.length === 1 && opened[0].jump.anchor === '我已经调整了侧边栏宽度。' && opened[0].jump.turn === 1,
   JSON.stringify(opened[0] && opened[0].jump),
@@ -753,6 +762,44 @@ check(
   'the page request carries the window',
   lastSearchBody !== null && lastSearchBody.filters !== undefined && lastSearchBody.filters.turns === 30,
   JSON.stringify(lastSearchBody),
+)
+
+// #endregion
+
+// #region mirrored search and panel scope --------------------------------------
+
+/* A panel scope limits which side of the exchange is searched. */
+const scopeProps = {
+  ...bodyRegistration.options.inject('session-1'),
+  t,
+  sessionId: 'session-1',
+  useChat,
+  useSession,
+  requestOlder: () => true,
+}
+let scopeTree = await settle('panel-scope', bodyRegistration.Component, scopeProps)
+const scopeInput = findNode(scopeTree, 'dsh-csearch-input')
+if (scopeInput !== null) scopeInput.props.onChange({ target: { value: '侧边栏' } })
+scopeTree = await settle('panel-scope', bodyRegistration.Component, scopeProps)
+check(
+  'scope chips appear with a query',
+  findAll(scopeTree, 'dsh-csearch-scope').length === 3,
+  String(findAll(scopeTree, 'dsh-csearch-scope').length),
+)
+check('the default scope shows both sides', flatten(scopeTree).join('|').replace(/\|/g, '').includes('我已经调整了侧边栏宽度'))
+
+const scopeChips = findAll(scopeTree, 'dsh-csearch-scope')
+if (scopeChips.length === 3) {
+  scopeChips[1].props.onClick()
+  scopeTree = await settle('panel-scope', bodyRegistration.Component, scopeProps)
+}
+const questionOnlyText = flatten(scopeTree).join('|')
+const questionOnlyPlain = questionOnlyText.replace(/\|/g, '')
+check('the question-only scope drops replies', !questionOnlyPlain.includes('我已经调整了侧边栏宽度'), questionOnlyText.slice(0, 300))
+check(
+  'the question-only scope keeps the question',
+  questionOnlyPlain.includes('帮我把右侧边栏的宽度调整一下'),
+  questionOnlyText.slice(0, 300),
 )
 
 // #endregion

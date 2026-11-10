@@ -17,7 +17,7 @@
 
 ## 当前状态
 
-- 版本：`1.0.2`
+- 版本：`1.1.0`
 - 包名：`dsh-chat-search`（npm 已发布 1.0.1）；宿主行 id 仍是 `conversation-search`
 - 测试：`test/host.mjs`、`test/client.mjs`（`npm test`）
 - 安装：应用内「插件 → 添加插件」搜 `dsh-chat-search`；或 `dsh plugin add dsh-chat-search`

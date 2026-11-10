@@ -17,7 +17,7 @@ window.__ModuleLoader__.load({
     /** Custom Highlight name for the arrival marker. */
     const HIGHLIGHT = 'dsh-chat-search'
     /** Shown in the UI so a stale client module is visible at a glance; test/build asserts it. */
-    const BUILD = 'v1.0.2'
+    const BUILD = 'v1.1.0'
 
     /** Diagnostics are off unless the reader opts in from DevTools. */
     function debugEnabled() {
@@ -80,6 +80,10 @@ window.__ModuleLoader__.load({
       'history.failed': '无法自动加载更早的历史',
       'jump.missing': '该内容尚未加载，请先加载全部历史',
       'clear': '清空',
+      'panel.scope.label': '检索范围',
+      'panel.scope.all': '全部',
+      'panel.scope.question': '仅问题',
+      'panel.scope.paragraph': '仅段落',
       'global.title': '全局搜索',
       'global.placeholder': '搜索所有会话，多个关键词用空格分隔',
       'global.subtitle': '在所有会话的标题、问题与段落中检索。结果按 会话 → 问题 → 段落 展开，点击即可打开会话并定位到对应位置。',
@@ -164,6 +168,10 @@ window.__ModuleLoader__.load({
       'history.failed': 'Could not load older history',
       'jump.missing': 'That message is not loaded yet; load all history first',
       'clear': 'Clear',
+      'panel.scope.label': 'Search in',
+      'panel.scope.all': 'All',
+      'panel.scope.question': 'Questions',
+      'panel.scope.paragraph': 'Replies',
       'global.title': 'Global search',
       'global.placeholder': 'Search every session; separate keywords with spaces',
       'global.subtitle': 'Search session titles, questions, and reply paragraphs across every Session. Results expand as session → question → paragraph; a click opens the Session at that spot.',
@@ -350,6 +358,9 @@ window.__ModuleLoader__.load({
       '.dsh-filter-toggle svg{flex:none;width:12px;height:12px}',
       '.dsh-filter-toggle-label{flex:none}',
       '.dsh-filter-summary{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.85}',
+      '.dsh-csearch-scopes{display:flex;align-items:center;gap:4px;padding:0 2px}',
+      '.dsh-csearch-scope{height:22px;padding:0 8px;border:.5px solid var(--dsw-alias-border-l1);border-radius:999px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:11px;cursor:pointer}',
+      '.dsh-csearch-scope[aria-checked="true"]{border-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-brand-primary);background:rgba(74,144,255,.12)}',
       '.dsh-cg-stats-actions{display:flex;gap:4px;margin-left:auto}',
       '.dsh-cg-link{padding:3px 8px;border:.5px solid transparent;border-radius:7px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:12px;cursor:pointer}',
       '.dsh-cg-link:hover{border-color:var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}',
@@ -459,6 +470,40 @@ window.__ModuleLoader__.load({
     function onFocusRequest(listener) {
       focusListeners.add(listener)
       return () => focusListeners.delete(listener)
+    }
+
+    /** Mirrored searches: a global jump asks the in-conversation panel to run the same query. */
+    const panelSearches = new Map()
+    const panelSearchListeners = new Set()
+
+    function requestPanelSearch(sessionId, query, scope) {
+      if (typeof query !== 'string' || query.trim() === '') return
+      panelSearches.set(sessionId, { query, scope: typeof scope === 'string' ? scope : 'all' })
+      for (const listener of panelSearchListeners) {
+        try {
+          listener(sessionId)
+        } catch (error) {
+          console.error('[conversation-search] panel search listener failed', error)
+        }
+      }
+    }
+
+    function takePanelSearch(sessionId) {
+      const request = panelSearches.get(sessionId)
+      panelSearches.delete(sessionId)
+      return request
+    }
+
+    function onPanelSearchRequest(listener) {
+      panelSearchListeners.add(listener)
+      return () => panelSearchListeners.delete(listener)
+    }
+
+    /** Map the page's five scopes onto the panel's three; session titles stay page-only. */
+    function panelScopeOf(scope) {
+      if (scope === 'question') return 'question'
+      if (scope === 'paragraph') return 'paragraph'
+      return 'all'
     }
 
     /** What the global page shows when the reader comes back to it. */
@@ -884,11 +929,13 @@ window.__ModuleLoader__.load({
      * Every message of a Turn is split into paragraphs; a paragraph that contains all
      * keywords is one result. The Turn's own question is the group header, so a reader
      * sees "which question does this answer belong to" before the paragraph itself.
-     * `filters` narrows the window to the last N Turns and/or a calendar date range.
+     * `filters` narrows the window to the last N Turns and/or a calendar date range; `scope`
+     * keeps only questions, only replies, or both (the panel never indexes Session titles).
      */
-    function searchConversation(order, nodes, query, filters) {
+    function searchConversation(order, nodes, query, filters, scope) {
       const words = normalizeWords(query)
       if (words.length === 0) return EMPTY_RESULTS
+      const only = scope === 'question' ? 'user' : scope === 'paragraph' ? 'assistant' : null
       const scopeFilters = filters === undefined ? defaultFilters() : filters
       const sinceMs = dayStart(scopeFilters.since)
       const untilMs = dayEnd(scopeFilters.until)
@@ -919,6 +966,7 @@ window.__ModuleLoader__.load({
         if (!inWindow(nodeTimeOf(node), sinceMs, untilMs)) continue
         const role = roleOf(node)
         if (role === null) continue
+        if (only !== null && role !== only) continue
         const content = textOfNode(node, role)
         if (content.text === '' && content.files.length === 0) continue
         if (role === 'user') {
@@ -1243,7 +1291,8 @@ window.__ModuleLoader__.load({
     // #region Right sidebar entry points
 
     /** Open the search tab for one Session and ask its panel for focus. */
-    function openSearchTab(ctx, sessionId) {
+    function openSearchTab(ctx, sessionId, options) {
+      const focus = options === undefined || options === null || options.focus !== false
       const tabs = ctx.get('sidebarRightTabs')
       if (!tabs || typeof tabs.get !== 'function' || tabs.get(TAB_KIND) === undefined) {
         console.warn('[conversation-search] the right-sidebar tab registry is not available')
@@ -1266,7 +1315,7 @@ window.__ModuleLoader__.load({
           return
         }
       }
-      requestFocus(sessionId)
+      if (focus) requestFocus(sessionId)
     }
 
     /** Bind Ctrl/Cmd+F to the in-conversation search, preferring the app's shortcut registry. */
@@ -1559,6 +1608,12 @@ window.__ModuleLoader__.load({
             console.error('[conversation-search] revealing the conversation panel failed', fallbackError)
           }
         }
+        return
+      }
+      /* Mirror the page's query into the panel so both entries behave the same afterwards. */
+      if (jump !== null && jump !== undefined && typeof jump.query === 'string' && jump.query.trim() !== '') {
+        requestPanelSearch(sessionId, jump.query, panelScopeOf(jump.scope))
+        openSearchTab(ctx, sessionId, { focus: false })
       }
     }
 
@@ -1776,6 +1831,7 @@ window.__ModuleLoader__.load({
       const [query, setQuery] = useState(() => storedQuery(sessionId))
       const [filters, setFilters] = useState(() => defaultFilters())
       const [filtersOpen, setFiltersOpen] = useState(false)
+      const [scope, setScope] = useState('all')
       const [results, setResults] = useState(EMPTY_RESULTS)
       const [error, setError] = useState('')
       const [autoLoad, setAutoLoad] = useState(false)
@@ -1783,6 +1839,8 @@ window.__ModuleLoader__.load({
       const bodyRef = useRef(null)
       const pagesRequested = useRef(0)
       const autoStarted = useRef(false)
+      /* True while the query came from a global jump rather than from typing. */
+      const mirrored = useRef(false)
 
       /* Focus the box when the header button opened (or re-revealed) this panel. */
       useEffect(() => {
@@ -1803,6 +1861,21 @@ window.__ModuleLoader__.load({
         return onFocusRequest((target) => {
           if (target === sessionId) focusNow()
           else if (target === null) focusVisible()
+        })
+      }, [sessionId])
+
+      /* A global jump mirrors itself here: same words, same window, same landing. */
+      useEffect(() => {
+        const apply = (request) => {
+          if (request === undefined) return
+          mirrored.current = true
+          setQuery(request.query)
+          storeQuery(sessionId, request.query)
+          setScope(request.scope)
+        }
+        apply(takePanelSearch(sessionId))
+        return onPanelSearchRequest((target) => {
+          if (target === sessionId) apply(takePanelSearch(sessionId))
         })
       }, [sessionId])
 
@@ -1858,7 +1931,7 @@ window.__ModuleLoader__.load({
         }
         const timer = setTimeout(() => {
           try {
-            setResults(searchConversation(order, nodeStore, trimmed, filters))
+            setResults(searchConversation(order, nodeStore, trimmed, filters, scope))
             setError('')
           } catch (failure) {
             console.error('[conversation-search] search failed', failure)
@@ -1867,10 +1940,12 @@ window.__ModuleLoader__.load({
           }
         }, SEARCH_DEBOUNCE_MS)
         return () => clearTimeout(timer)
-      }, [query, order, nodeStore, running, filters])
+      }, [query, order, nodeStore, running, filters, scope])
 
-      /* Searching a truncated window is a trap: page the rest in as soon as a query exists. */
+      /* Searching a truncated window is a trap: page the rest in as soon as a query exists.
+         A mirrored search deliberately skips this: the jump already loaded what it needed. */
       useEffect(() => {
+        if (mirrored.current) return
         if (query.trim() === '' || !hasMore || autoLoad || loadingOlder) return
         if (autoStarted.current) return
         autoStarted.current = true
@@ -1904,6 +1979,8 @@ window.__ModuleLoader__.load({
       const onChange = useCallback(
         (event) => {
           const next = event.target.value
+          /* Typing takes the search back from the jump that mirrored it. */
+          mirrored.current = false
           setQuery(next)
           storeQuery(sessionId, next)
         },
@@ -2066,6 +2143,26 @@ window.__ModuleLoader__.load({
               : h('button', { type: 'button', className: 'dsh-csearch-clear', title: t('clear'), 'aria-label': t('clear'), onClick: onClear }, h(IconClose, null)),
           ),
           filterBarCompact(t, filters, applyFilters, filtersOpen, () => setFiltersOpen((current) => !current)),
+          query.trim() === ''
+            ? null
+            : h(
+                'div',
+                { className: 'dsh-csearch-scopes', role: 'radiogroup', 'aria-label': t('panel.scope.label') },
+                ['all', 'question', 'paragraph'].map((id) =>
+                  h(
+                    'button',
+                    {
+                      key: id,
+                      type: 'button',
+                      className: 'dsh-csearch-scope',
+                      role: 'radio',
+                      'aria-checked': scope === id,
+                      onClick: () => setScope(id),
+                    },
+                    t('panel.scope.' + id),
+                  ),
+                ),
+              ),
           showBanner
             ? h(
                 'div',
@@ -2326,23 +2423,41 @@ window.__ModuleLoader__.load({
       )
 
       const openSession = useCallback((session) => openTarget(session.id, null, titleOf(session)), [openTarget, titleOf])
+      /* The panel mirrors this query after the jump: same words, same window, same landing. */
+      const jumpQuery = result === null || typeof result.query !== 'string' ? '' : result.query
       const openQuestion = useCallback(
         (session, question) =>
           openTarget(
             session.id,
-            { seq: question.seq, kind: 'question', words: resultWords, anchor: question.anchor, turn: question.number },
+            {
+              seq: question.seq,
+              kind: 'question',
+              words: resultWords,
+              anchor: question.anchor,
+              turn: question.number,
+              query: jumpQuery,
+              scope,
+            },
             titleOf(session),
           ),
-        [openTarget, resultWords, titleOf],
+        [openTarget, resultWords, titleOf, jumpQuery, scope],
       )
       const openParagraph = useCallback(
         (session, paragraph) =>
           openTarget(
             session.id,
-            { seq: paragraph.seq, kind: 'paragraph', words: resultWords, anchor: paragraph.anchor, turn: paragraph.turn },
+            {
+              seq: paragraph.seq,
+              kind: 'paragraph',
+              words: resultWords,
+              anchor: paragraph.anchor,
+              turn: paragraph.turn,
+              query: jumpQuery,
+              scope,
+            },
             titleOf(session),
           ),
-        [openTarget, resultWords, titleOf],
+        [openTarget, resultWords, titleOf, jumpQuery, scope],
       )
 
       const paragraphRow = (session, question, paragraph) => {

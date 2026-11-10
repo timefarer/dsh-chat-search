@@ -35,6 +35,8 @@
 | R27 | 发布 | 被 dsh-market 检索到 | 🟡 | 收录目录 PR [#13785](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/13785) 已提交，等评审合并；合并后站点与市场自动收录 |
 | R28 | 发布 | 安装说明要通用，不绑定本机 | ✅ | 应用内「插件 → 添加插件」优先；命令行 `dsh plugin add dsh-chat-search`，指定 profile 时再加 `--profile` |
 | R29 | 发布 | 代码与对话工作区分离 | ✅ | 仓库迁到 `deepseek-harness/projects/dsh-chat-search`，profile 从新路径 link 安装 |
+| R30 | 联动 | 从全局跳转后在会话内面板按同一关键词与范围重跑检索，并定位到同一段 | ✅ | 跳转载荷携带 `query`/`scope`；`openTarget` 自动开面板并把请求交给它 |
+| R31 | 联动 | 会话内面板可切换检索范围（全部 / 仅问题 / 仅段落） | ✅ | 面板范围胶囊；全局 5 档映射到 3 档（标题只在全局页） |
 
 ## 需求变更记录
 
