@@ -3,6 +3,8 @@
 [![ci](https://github.com/yhaix/dsh-chat-search/actions/workflows/ci.yml/badge.svg)](https://github.com/yhaix/dsh-chat-search/actions/workflows/ci.yml)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
+简体中文 | [English](README.en.md)
+
 **DeepSeek Harness（`dsh`）的对话检索插件**：在右侧栏检索当前对话，或在左栏打开整页的全局检索；
 按**段落**与**文件名**匹配，结果按「会话 → 问题 → 段落」三层展开；可用**日期范围**和**每会话轮次**
 收窄范围；点击结果直接跳到具体段落，命中词用浏览器查找式高亮，滚动时跟随。
