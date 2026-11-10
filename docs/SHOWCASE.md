@@ -186,15 +186,18 @@
 
 ## 8. 30 秒上手
 
-**应用内安装（推荐）**：DSH → **插件** 页 → **Add plugin** → 搜索 `dsh-chat-search` → **Install**。
+**应用内安装（推荐）**：DSH → **插件** 页 → **添加插件** → 搜索 `dsh-chat-search` → **安装**。
 
-**命令行**（`<profile>` 换成你的 profile：桌面端一般是 `desktop`，普通 `dsh web` 是 `web`）：
+**命令行**：
 
 ```sh
-dsh plugin --profile <profile> add dsh-chat-search
+dsh plugin add dsh-chat-search
+
+# 指定 profile 时
+dsh plugin --profile desktop add dsh-chat-search
 
 # 从源码（开发时）
-dsh plugin --profile <profile> add link:<本目录>
+dsh plugin add link:<本目录>
 ```
 
 安装后**完全退出并重开 DSH**（Host 半区只在进程启动时加载一次，刷新页面不够），然后：
