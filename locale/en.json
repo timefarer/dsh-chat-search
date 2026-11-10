@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Conversation search",
+    "description": "Search messages, questions, and file names from the right sidebar or the global page; results are grouped as session, question, and paragraph, and a click jumps to that spot in the conversation."
+  }
+}
