@@ -318,6 +318,24 @@ check('a fresh instance reads the persisted history', JSON.parse(reloaded).value
 
 // #endregion
 
+// #region warm-up and response cache -------------------------------------------
+
+const warm = await post({ action: 'warm' })
+check('warm returns the corpus size', typeof warm.body.value.sessions === 'number' && warm.body.value.sessions >= 4, JSON.stringify(warm.body.value))
+check('warm reports a build time', typeof warm.body.value.buildMs === 'number', JSON.stringify(warm.body.value))
+
+const firstCached = await post({ action: 'search', query: '侧边栏 折叠', scope: 'all' })
+const secondCached = await post({ action: 'search', query: '侧边栏 折叠', scope: 'all' })
+check('a first search is computed', firstCached.body.value.stats.cached !== true, JSON.stringify(firstCached.body.value.stats))
+check('an identical search is served from the cache', secondCached.body.value.stats.cached === true, JSON.stringify(secondCached.body.value.stats))
+check(
+  'the cached response keeps the same hits',
+  JSON.stringify(secondCached.body.value.sessions) === JSON.stringify(firstCached.body.value.sessions),
+  'sessions differ',
+)
+
+// #endregion
+
 // #region filter window -------------------------------------------------------
 
 /** One local calendar date, `daysAgo` days before now. */

@@ -22,6 +22,11 @@ const MAX_BODY_BYTES = 128 * 1024
 const INDEX_TTL_MS = 30_000
 /** A hard floor between rebuilds, so a streaming reply cannot rebuild on every keystroke. */
 const INDEX_MIN_AGE_MS = 2_500
+/** A stored log has no cheap revision: its parsed entry is reused for this long between rebuilds. */
+const STORED_REUSE_MS = 10 * 60_000
+/** Identical searches reuse their serialized result for this long. */
+const RESPONSE_TTL_MS = 60_000
+const MAX_RESPONSE_CACHE = 32
 /** Sessions indexed at most (newest first), and the text budget across all of them. */
 const MAX_SESSIONS = 400
 const MAX_TOTAL_CHARS = 8_000_000
@@ -69,12 +74,14 @@ export function apply(ctx) {
   const index = createIndex(ctx)
   const recent = createRecentStore()
   const filters = createFilterStore()
+  /** Identical search results, keyed by query/scope/filters/index version. */
+  const responseCache = new Map()
   ctx.effect(
     () =>
       ctx.webServer.register({
         kind: 'prefix',
         path: ROUTE_PATH,
-        handler: (req, res) => handleRequest(ctx, index, recent, filters, req, res),
+        handler: (req, res) => handleRequest(ctx, index, recent, filters, responseCache, req, res),
       }),
     'conversation-search: api route',
   )
@@ -88,10 +95,11 @@ export function apply(ctx) {
  * @param index - the corpus index.
  * @param recent - the recent-query store.
  * @param filters - the saved filter store.
+ * @param responseCache - the TTL cache for identical searches.
  * @param req - the request face (async-iterable body).
  * @param res - the response face.
  */
-async function handleRequest(ctx, index, recent, filters, req, res) {
+async function handleRequest(ctx, index, recent, filters, responseCache, req, res) {
   const connection = ctx.get('connection')
   if (connection !== undefined && typeof connection.requestRejection === 'function') {
     let rejection
@@ -123,7 +131,18 @@ async function handleRequest(ctx, index, recent, filters, req, res) {
   try {
     if (payload.action === 'status') {
       const corpus = await index.ensure()
-      sendJson(res, 200, { ok: true, value: { sessions: corpus.size, builtAt: index.builtAt() } })
+      sendJson(res, 200, {
+        ok: true,
+        value: { sessions: corpus.size, builtAt: index.builtAt(), buildMs: index.buildMs() },
+      })
+      return
+    }
+    if (payload.action === 'warm') {
+      const corpus = await index.ensure(payload.refresh === true)
+      sendJson(res, 200, {
+        ok: true,
+        value: { sessions: corpus.size, builtAt: index.builtAt(), buildMs: index.buildMs() },
+      })
       return
     }
     if (payload.action === 'recent') {
@@ -146,7 +165,25 @@ async function handleRequest(ctx, index, recent, filters, req, res) {
       return
     }
     const corpus = await index.ensure(payload.refresh === true)
-    const value = searchCorpus(corpus, query, scope, started, active)
+    /* An identical search inside the TTL reuses the folded result; the index version keys it. */
+    const cacheKey = `${index.builtAt()}|${query}|${scope}|${active.since}|${active.until}|${active.turns}`
+    const cached = responseCache.get(cacheKey)
+    const fresh = cached === undefined || Date.now() - cached.at >= RESPONSE_TTL_MS
+    if (fresh) {
+      const computed = searchCorpus(corpus, query, scope, started, active)
+      responseCache.set(cacheKey, { at: Date.now(), value: computed })
+      if (responseCache.size > MAX_RESPONSE_CACHE) {
+        const oldest = responseCache.keys().next().value
+        if (oldest !== undefined) responseCache.delete(oldest)
+      }
+    }
+    const base = fresh ? responseCache.get(cacheKey).value : cached.value
+    const value = {
+      query,
+      scope,
+      sessions: base.sessions,
+      stats: { ...base.stats, tookMs: Date.now() - started, cached: !fresh },
+    }
     /* Recorded only after the search succeeded, so a failed request never enters history. */
     value.recent = await recent.remember(query)
     value.filters = await filters.write(active)
@@ -392,19 +429,24 @@ function createFilterStore() {
  */
 function createIndex(ctx) {
   const cache = new Map()
+  /* Stored logs have no cheap revision, so their parsed entry is reused for a bounded while. */
+  const stored = new Map()
   let builtAt = 0
+  let buildMs = 0
   let building = null
 
-  async function rebuild() {
+  async function rebuild(force) {
+    const buildStarted = Date.now()
     const query = ctx.get('sessionQuery')
     if (query === undefined) throw new Error('sessionQuery is unavailable')
     const liveSessions = ctx.get('sessions')
     const records = await query.listSessions()
     const next = new Map()
     let budget = MAX_TOTAL_CHARS
+    if (force) stored.clear()
 
-    for (let offset = 0; offset < records.length && offset < MAX_SESSIONS && budget > 0; offset += 4) {
-      const batch = records.slice(offset, offset + 4)
+    for (let offset = 0; offset < records.length && offset < MAX_SESSIONS && budget > 0; offset += 8) {
+      const batch = records.slice(offset, offset + 8)
       const parsed = await Promise.all(
         batch.map(async (record) => {
           const id = record.header.id
@@ -414,8 +456,14 @@ function createIndex(ctx) {
             const signature = events === undefined ? 'stored' : `live:${events.length}`
             const hit = cache.get(id)
             if (hit !== undefined && hit.signature === signature) return hit
+            const kept = stored.get(id)
+            if (events === undefined && kept !== undefined && Date.now() - kept.at < STORED_REUSE_MS) {
+              return kept.entry
+            }
             const log = events === undefined ? (await query.readSession(id)).events : events
-            return parseSession(id, record.header, log, signature)
+            const entry = parseSession(id, record.header, log, signature)
+            if (events === undefined) stored.set(id, { entry, at: Date.now() })
+            return entry
           } catch (error) {
             return undefined
           }
@@ -431,6 +479,7 @@ function createIndex(ctx) {
     cache.clear()
     for (const [id, entry] of next) cache.set(id, entry)
     builtAt = Date.now()
+    buildMs = builtAt - buildStarted
     return cache
   }
 
@@ -444,12 +493,13 @@ function createIndex(ctx) {
         if (cache.size > 0 && age < INDEX_TTL_MS && !liveMoved(ctx, cache)) return cache
       }
       if (building !== null) return building
-      building = rebuild().finally(() => {
+      building = rebuild(force).finally(() => {
         building = null
       })
       return building
     },
     builtAt: () => builtAt,
+    buildMs: () => buildMs,
   }
 }
 

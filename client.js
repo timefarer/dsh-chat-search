@@ -511,6 +511,8 @@ window.__ModuleLoader__.load({
 
     /** Recent global queries, newest first; page memory only, never persisted. */
     const recentQueries = []
+    /** The Host index is warmed once per page load, not on every visit to the page. */
+    let warmStarted = false
 
     function recordRecent(query) {
       const index = recentQueries.indexOf(query)
@@ -1610,6 +1612,8 @@ window.__ModuleLoader__.load({
         }
         return
       }
+      /* Ask for the target history at once instead of waiting for the first poll. */
+      if (jump !== null && jump !== undefined && typeof jump.seq === 'number') requestThrough(ctx, sessionId, jump.seq)
       /* Mirror the page's query into the panel so both entries behave the same afterwards. */
       if (jump !== null && jump !== undefined && typeof jump.query === 'string' && jump.query.trim() !== '') {
         requestPanelSearch(sessionId, jump.query, panelScopeOf(jump.scope))
@@ -2346,6 +2350,13 @@ window.__ModuleLoader__.load({
         if (input !== null && typeof input.focus === 'function') input.focus()
       }, [])
 
+      /* Warm the Host index in the background, so the first query is not the one paying for it. */
+      useEffect(() => {
+        if (warmStarted) return
+        warmStarted = true
+        postGlobal({ action: 'warm' }).catch(() => {})
+      }, [])
+
       /* Pull the persisted history once; a failure keeps whatever memory already holds. */
       useEffect(() => {
         const controller = new AbortController()
@@ -2870,7 +2881,8 @@ window.__ModuleLoader__.load({
             return
           }
           if (pending.tries === 1 || pending.tries % 8 === 0) requestThroughSeq(pending.seq)
-          timer = setTimeout(tick, 120)
+          /* Poll tightly right after opening: the first rows usually land within a frame or two. */
+          timer = setTimeout(tick, pending.tries <= 3 ? 60 : 120)
         }
         tick()
         return () => {
