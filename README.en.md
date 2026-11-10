@@ -11,7 +11,7 @@ match **paragraphs** and **file names**, expand as a **session → question → 
 can be narrowed by **date range** and **turn count**, and a click jumps to the exact paragraph
 with the matched words highlighted.
 
-> Status: 1.0.2, targets DSH ≥ 0.2.0-rc.1. Best effort — the plugin leans on a few undocumented
+> Status: 1.1.0, targets DSH ≥ 0.2.0-rc.1. Best effort — the plugin leans on a few undocumented
 > DOM anchors and client services, so a future DSH release may break it; fixes follow quickly.
 
 ## Screenshots
