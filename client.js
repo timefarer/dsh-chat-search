@@ -318,11 +318,10 @@ window.__ModuleLoader__.load({
       '.dsh-cg-legend{padding:0 2px 8px;color:var(--dsw-alias-label-secondary);font-size:11px;opacity:.85}',
       '.dsh-cg-spinner-sm{width:11px;height:11px;border-width:1.5px;margin-right:5px;vertical-align:-1px}',
       '.dsh-spin{flex:none;color:var(--dsw-alias-brand-primary);animation:dsh-cg-spin .9s linear infinite}',
-      '.dsh-spin{flex:none;color:var(--dsw-alias-brand-primary);animation:dsh-cg-spin .9s linear infinite}',
       '.dsh-cg-pulse{display:inline-flex;align-items:center;color:var(--dsw-alias-brand-primary)}',
-      '.dsh-cg-pill{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:1200;display:flex;align-items:center;gap:10px;max-width:min(520px,90vw);padding:9px 14px;border:.5px solid var(--dsw-alias-border-l2);border-radius:999px;background:var(--dsw-alias-bg-overlay);box-shadow:0 10px 30px rgba(0,0,0,.16);cursor:progress;pointer-events:none;animation:dsh-cg-mask-in .12s ease-out}',
+      '.dsh-cg-pill{position:fixed;top:42%;left:50%;transform:translate(-50%,-50%);z-index:2000;display:flex;align-items:center;gap:12px;max-width:min(560px,90vw);padding:12px 18px;border:.5px solid var(--dsw-alias-border-l2);border-radius:14px;background:var(--dsw-alias-bg-overlay);box-shadow:0 18px 48px rgba(0,0,0,.2);cursor:progress;pointer-events:none;animation:dsh-cg-mask-in .14s ease-out}',
       '.dsh-cg-tree{display:flex;flex-direction:column;gap:8px}',
-      '.dsh-cg-session{border:.5px solid var(--dsw-alias-border-l1);border-radius:var(--dsw-radius-md,10px);background:var(--dsw-alias-bg-layer-1);overflow:hidden}',
+      '.dsh-cg-session{border:.5px solid rgba(127,127,127,.28);border-radius:var(--dsw-radius-md,10px);background:var(--dsw-alias-bg-layer-1);overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.05)}',
       '.dsh-cg-session-head{display:flex;align-items:center;gap:8px;padding:8px 10px 8px 8px}',
       '.dsh-cg-toggle{display:flex;align-items:center;gap:8px;flex:1;min-width:0;padding:4px;border:0;border-radius:var(--dsw-radius-sm,8px);background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}',
       '.dsh-cg-toggle:hover{background:var(--dsw-alias-bg-layer-2)}',
@@ -404,15 +403,15 @@ window.__ModuleLoader__.load({
       '.dsh-cg-questions{margin:0 8px 6px 20px;padding-left:12px;border-left:1.5px solid var(--dsw-alias-border-l1)}',
       '.dsh-cg-question{border-top:.5px solid var(--dsw-alias-border-l1)}',
       '.dsh-cg-question:first-child{border-top:0}',
-      '.dsh-cg-question-row{display:flex;align-items:center;gap:8px;margin:2px 0;padding:2px 4px;border-radius:9px;background:var(--dsw-alias-bg-layer-2)}',
+      '.dsh-cg-question-row{display:flex;align-items:center;gap:8px;margin:3px 0;padding:3px 5px;border-radius:9px;background:rgba(127,127,127,.12)}',
       '.dsh-cg-question-toggle{display:flex;align-items:center;gap:7px;flex:1;min-width:0;padding:6px;border:0;border-radius:8px;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}',
       '.dsh-cg-question-toggle:hover{background:var(--dsw-alias-bg-layer-2)}',
       '.dsh-cg-question-toggle:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-2px}',
       '.dsh-cg-q-tag{flex:none;color:var(--dsw-alias-brand-primary);font-size:11px;font-weight:600;white-space:nowrap}',
       '.dsh-cg-q-text{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;line-height:1.5}',
       '.dsh-cg-paras{display:flex;flex-direction:column;gap:4px;padding:0 6px 8px}',
-      '.dsh-cg-para{display:flex;flex-direction:column;gap:5px;width:100%;padding:8px 10px;border:.5px solid var(--dsw-alias-border-l1);border-radius:10px;background:var(--dsw-alias-bg-base);color:inherit;font:inherit;text-align:left;cursor:pointer;content-visibility:auto;contain-intrinsic-size:auto 76px}',
-      '.dsh-cg-para:hover{border-color:var(--dsw-alias-brand-primary);background:rgba(74,144,255,.07)}',
+      '.dsh-cg-para{display:flex;flex-direction:column;gap:5px;width:100%;padding:8px 10px;border:.5px solid rgba(127,127,127,.28);border-radius:10px;background:var(--dsw-alias-bg-base);color:inherit;font:inherit;text-align:left;cursor:pointer;content-visibility:auto;contain-intrinsic-size:auto 76px}',
+      '.dsh-cg-para:hover{border-color:var(--dsw-alias-brand-primary);background:rgba(74,144,255,.10);box-shadow:0 1px 6px rgba(0,0,0,.06)}',
       '.dsh-cg-para:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-2px}',
       '.dsh-cg-para-meta{display:flex;align-items:center;gap:7px;color:var(--dsw-alias-label-secondary);font-size:11px}',
       '.dsh-cg-para-hits{padding:0 7px;border-radius:999px;background:color-mix(in srgb,var(--dsw-alias-brand-primary) 12%,transparent);color:var(--dsw-alias-brand-primary)}',
@@ -448,13 +447,13 @@ window.__ModuleLoader__.load({
       '.dsh-csearch-hits{padding:0 6px;border-radius:999px;background:color-mix(in srgb,var(--dsw-alias-brand-primary) 12%,transparent);color:var(--dsw-alias-brand-primary)}',
       '.dsh-csearch-snippet{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;line-height:1.6;font-size:13px}',
       '.dsh-csearch-group mark,.dsh-csearch-snippet mark{padding:0 1px;border-radius:2px;background:rgba(255,199,0,.45);color:inherit}',
-      /* The jump indicator: a non-blocking pill, so a click is acknowledged without a modal. */
-      '.dsh-cg-jump{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:1200;display:flex;align-items:center;gap:10px;max-width:min(520px,90vw);padding:9px 14px;border:.5px solid var(--dsw-alias-border-l2);border-radius:999px;background:var(--dsw-alias-bg-overlay);box-shadow:0 10px 30px rgba(0,0,0,.16);cursor:progress;pointer-events:none;animation:dsh-cg-mask-in .12s ease-out}',
-      '.dsh-cg-mask-text{display:flex;flex-direction:column;gap:1px;min-width:0}',
-      '.dsh-cg-mask-text strong{font-size:12.5px;font-weight:600;color:var(--dsw-alias-label-primary)}',
-      '.dsh-cg-mask-sub{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px;color:var(--dsw-alias-label-secondary)}',
+      /* The jump indicator: centred and non-blocking, so a click is always acknowledged. */
+      '.dsh-cg-jump{position:fixed;top:42%;left:50%;transform:translate(-50%,-50%);z-index:2000;display:flex;align-items:center;gap:12px;max-width:min(560px,90vw);padding:12px 18px;border:.5px solid var(--dsw-alias-border-l2);border-radius:14px;background:var(--dsw-alias-bg-overlay);box-shadow:0 18px 48px rgba(0,0,0,.2);cursor:progress;pointer-events:none;animation:dsh-cg-mask-in .14s ease-out}',
+      '.dsh-cg-mask-text{display:flex;flex-direction:column;gap:2px;min-width:0}',
+      '.dsh-cg-mask-text strong{font-size:13px;font-weight:600;color:var(--dsw-alias-label-primary)}',
+      '.dsh-cg-mask-sub{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--dsw-alias-label-secondary)}',
       '@keyframes dsh-cg-spin{to{transform:rotate(360deg)}}',
-      '@keyframes dsh-cg-mask-in{from{opacity:0;transform:translate(-50%,-4px)}to{opacity:1;transform:translate(-50%,0)}}',
+      '@keyframes dsh-cg-mask-in{from{opacity:0}to{opacity:1}}',
     ].join('\n')
 
     const EMPTY_RESULTS = { groups: [], matches: 0, truncated: false }
@@ -2283,6 +2282,11 @@ window.__ModuleLoader__.load({
       const [filters, setFilters] = useState(() => defaultFilters())
       const [tick, setTick] = useState(0)
       const [refreshing, setRefreshing] = useState(false)
+      /* The row whose jump is in flight: it spins in place, so feedback never depends on the overlay. */
+      const [pendingRow, setPendingRow] = useState('')
+      useEffect(() => onOpeningChange((snapshot) => {
+        if (!snapshot.active) setPendingRow('')
+      }), [])
       const abortRef = useRef(null)
       const inputRef = useRef(null)
       const bodyRef = useRef(null)
@@ -2510,11 +2514,18 @@ window.__ModuleLoader__.load({
         [sessionIndex, t],
       )
 
-      const openSession = useCallback((session) => openTarget(session.id, null, titleOf(session)), [openTarget, titleOf])
+      const openSession = useCallback(
+        (session) => {
+          setPendingRow('s:' + session.id)
+          openTarget(session.id, null, titleOf(session))
+        },
+        [openTarget, titleOf],
+      )
       /* The panel mirrors this query after the jump: same words, same window, same landing. */
       const jumpQuery = result === null || typeof result.query !== 'string' ? '' : result.query
       const openQuestion = useCallback(
-        (session, question) =>
+        (session, question) => {
+          setPendingRow('q:' + session.id + ':' + question.seq)
           openTarget(
             session.id,
             {
@@ -2527,11 +2538,13 @@ window.__ModuleLoader__.load({
               scope,
             },
             titleOf(session),
-          ),
+          )
+        },
         [openTarget, resultWords, titleOf, jumpQuery, scope],
       )
       const openParagraph = useCallback(
-        (session, paragraph) =>
+        (session, question, paragraph) => {
+          setPendingRow(question.seq + ':' + paragraph.index)
           openTarget(
             session.id,
             {
@@ -2544,7 +2557,8 @@ window.__ModuleLoader__.load({
               scope,
             },
             titleOf(session),
-          ),
+          )
+        },
         [openTarget, resultWords, titleOf, jumpQuery, scope],
       )
 
@@ -2560,7 +2574,7 @@ window.__ModuleLoader__.load({
             key: question.seq + ':' + paragraph.index,
             'data-csearch-row': '',
             title: t('jump.paraHint'),
-            onClick: () => openParagraph(session, paragraph),
+            onClick: () => openParagraph(session, question, paragraph),
           },
           h(
             'span',
@@ -2569,7 +2583,9 @@ window.__ModuleLoader__.load({
             typeof paragraph.hits === 'number' && paragraph.hits > 1
               ? h('span', { className: 'dsh-cg-para-hits' }, t('global.paragraph.hits', { count: paragraph.hits }))
               : null,
-            h('span', { className: 'dsh-cg-go', 'aria-hidden': 'true' }, '↗'),
+            pendingRow === question.seq + ':' + paragraph.index
+              ? spinner('sm')
+              : h('span', { className: 'dsh-cg-go', 'aria-hidden': 'true' }, '↗'),
           ),
           fileOnly
             ? h(
@@ -2607,7 +2623,9 @@ window.__ModuleLoader__.load({
                 title: open ? t('collapse') : t('expand'),
                 onClick: () => toggle(openKey),
               },
-              h(IconCaret, { className: 'dsh-cg-caret', open }),
+              pendingRow === 'q:' + session.id + ':' + question.seq
+                ? spinner('sm')
+                : h(IconCaret, { className: 'dsh-cg-caret', open }),
               label,
               text,
             )
@@ -2693,7 +2711,9 @@ window.__ModuleLoader__.load({
                     title: open ? t('collapse') : t('expand'),
                     onClick: () => toggle(openKey),
                   },
-                  h(IconCaret, { className: 'dsh-cg-caret', open }),
+                  pendingRow === 's:' + session.id
+                    ? spinner('sm')
+                    : h(IconCaret, { className: 'dsh-cg-caret', open }),
                   h('span', { className: 'dsh-cg-session-title', title }, markSegments(segmentsOf(title, resultWords))),
                 )
               : h(
