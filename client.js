@@ -582,6 +582,8 @@ window.__ModuleLoader__.load({
     /** Announce one Session open (or one jump inside it) to the frame-wide indicator. */
     function beginOpening(sessionId, title, target) {
       if (openingState.timer !== null) clearTimeout(openingState.timer)
+      /* A new jump replaces whatever marker the last one left on screen. */
+      clearHighlight()
       openingState.active = true
       openingState.sessionId = sessionId
       openingState.title = typeof title === 'string' ? title : ''
@@ -1148,7 +1150,6 @@ window.__ModuleLoader__.load({
     let highlightLayer = null
     let highlightBoxes = []
     let highlightRanges = []
-    let highlightScroller = null
     let highlightFrame = 0
 
     /** Native text highlight: the browser-find look, anchored to the text so it scrolls with it. */
@@ -1212,9 +1213,9 @@ window.__ModuleLoader__.load({
         cancelAnimationFrame(highlightFrame)
         highlightFrame = 0
       }
-      if (highlightScroller !== null) {
-        highlightScroller.removeEventListener('scroll', scheduleOverlay)
-        highlightScroller = null
+      /* A capture listener on the document sees every scroller, including one replaced mid-jump. */
+      if (typeof document !== 'undefined' && typeof document.removeEventListener === 'function') {
+        document.removeEventListener('scroll', scheduleOverlay, true)
       }
       if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
         window.removeEventListener('resize', scheduleOverlay)
@@ -1233,7 +1234,7 @@ window.__ModuleLoader__.load({
     }
 
     /** Fallback marker for a build without the Custom Highlight API: boxes that follow scrolling. */
-    function paintOverlay(ranges, scroller) {
+    function paintOverlay(ranges) {
       detachOverlay()
       if (ranges.length === 0) return
       if (typeof document === 'undefined' || !document.body) return
@@ -1253,9 +1254,9 @@ window.__ModuleLoader__.load({
         highlightRanges.push(range)
       }
       highlightLayer = layer
-      highlightScroller =
-        scroller !== null && scroller !== undefined && typeof scroller.addEventListener === 'function' ? scroller : null
-      if (highlightScroller !== null) highlightScroller.addEventListener('scroll', scheduleOverlay, { passive: true })
+      if (typeof document.addEventListener === 'function') {
+        document.addEventListener('scroll', scheduleOverlay, { capture: true, passive: true })
+      }
       if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
         window.addEventListener('resize', scheduleOverlay)
       }
@@ -1286,7 +1287,7 @@ window.__ModuleLoader__.load({
       const ranges = wordRanges(row, words)
       const native = applyNativeHighlight(ranges)
       if (native) detachOverlay()
-      else paintOverlay(ranges, scroller)
+      else paintOverlay(ranges)
       debugLog('highlight', { ranges: ranges.length, native })
       return ranges
     }
@@ -1344,32 +1345,54 @@ window.__ModuleLoader__.load({
 
     // #region Right sidebar entry points
 
-    /** Open the search tab for one Session and ask its panel for focus. */
+    /** Pending retry timers for a tab that is asked for before the sidebar is ready. */
+    const tabRetries = new Map()
+
+    /**
+     * Open the search tab for one Session and ask its panel for focus.
+     *
+     * Right after a session switch the sidebar registries can still be mid-mount, so a failed
+     * attempt is retried briefly instead of dropping the request.
+     */
     function openSearchTab(ctx, sessionId, options) {
       const focus = options === undefined || options === null || options.focus !== false
-      const tabs = ctx.get('sidebarRightTabs')
-      if (!tabs || typeof tabs.get !== 'function' || tabs.get(TAB_KIND) === undefined) {
-        console.warn('[conversation-search] the right-sidebar tab registry is not available')
-        return
-      }
-      const sidebar = ctx.get('sidebarRight')
-      if (!sidebar) {
-        console.warn('[conversation-search] the right sidebar controller is not available')
-        return
-      }
-      try {
-        /* The on-screen Session's own path, the one a chat file link takes: it also expands the column. */
-        sidebar.openTab(TAB_KIND, { revealIfOpened: true })
-      } catch (error) {
-        try {
-          if (typeof sidebar.openTabIn !== 'function') throw error
-          sidebar.openTabIn(sessionId, TAB_KIND, { revealIfOpened: true })
-        } catch (fallbackError) {
-          console.error('[conversation-search] could not open the search tab', fallbackError)
+      const pending = tabRetries.get(sessionId)
+      if (pending !== undefined) clearTimeout(pending)
+
+      const attempt = (remaining) => {
+        const tabs = ctx.get('sidebarRightTabs')
+        const sidebar = ctx.get('sidebarRight')
+        const ready = Boolean(tabs) && typeof tabs.get === 'function' && tabs.get(TAB_KIND) !== undefined && Boolean(sidebar)
+        if (ready) {
+          try {
+            /* The on-screen Session's own path, the one a chat file link takes: it also expands the column. */
+            sidebar.openTab(TAB_KIND, { revealIfOpened: true })
+            tabRetries.delete(sessionId)
+            if (focus) requestFocus(sessionId)
+            return
+          } catch (error) {
+            try {
+              if (typeof sidebar.openTabIn !== 'function') throw error
+              sidebar.openTabIn(sessionId, TAB_KIND, { revealIfOpened: true })
+              tabRetries.delete(sessionId)
+              if (focus) requestFocus(sessionId)
+              return
+            } catch (fallbackError) {
+              /* Fall through to a short retry: the column may still be mounting. */
+            }
+          }
+        }
+        if (remaining <= 0) {
+          tabRetries.delete(sessionId)
+          console.warn('[conversation-search] the right-sidebar tab is still unavailable')
           return
         }
+        tabRetries.set(
+          sessionId,
+          setTimeout(() => attempt(remaining - 1), 180),
+        )
       }
-      if (focus) requestFocus(sessionId)
+      attempt(6)
     }
 
     /** Bind Ctrl/Cmd+F to the in-conversation search, preferring the app's shortcut registry. */
