@@ -3,4 +3,5 @@ node_modules/
 *.tgz
 .DS_Store
 Thumbs.db
-.submission/
+# 本地私有笔记（开发记录、投稿材料、SYS-CODE 相关），不公开
+.notes/
