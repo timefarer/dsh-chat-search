@@ -49,7 +49,7 @@
 
 DSH → **插件** 页 → **添加插件** → 搜索 `dsh-chat-search` → **安装**。
 
-**命令行安装**
+**DSH CLI 安装**
 
 ```sh
 dsh plugin add dsh-chat-search
