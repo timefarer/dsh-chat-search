@@ -45,9 +45,7 @@ window.__ModuleLoader__.load({
     const GLOBAL_ROUTE = 'conversation-search/api'
     /** How long typing waits before a global request goes out. */
     const GLOBAL_DEBOUNCE_MS = 320
-    /** A brief open finishes silently; only a real wait earns the transition mask. */
-    const OPENING_REVEAL_MS = 160
-    /** The mask never outlives a stalled open. */
+    /** The jump indicator never outlives a stalled jump. */
     const OPENING_TIMEOUT_MS = 20_000
     /** The five search depths, outermost first. */
     const SCOPES = [
@@ -126,9 +124,17 @@ window.__ModuleLoader__.load({
       'open': '打开',
       'expandAll': '全部展开',
       'collapseAll': '全部收起',
+      'expand': '展开',
+      'collapse': '收起',
       'panel.enter': '回车跳到第一条',
       'opening.title': '正在打开会话…',
       'opening.tip': '历史较长时需要一点时间',
+      'jump.title': '正在跳到第 {turn} 轮…',
+      'jump.hint': '正在定位并高亮命中内容',
+      'global.legend': '▾ 展开 / 收起 　 ↗ 点击跳到该段落并高亮',
+      'global.refreshing': '正在重建索引…',
+      'jump.label': '跳转',
+      'jump.paraHint': '跳到这一段并高亮命中内容',
       'file.only': '文件',
       'global.refresh': '刷新索引',
       'global.widen': '在全部范围中搜索',
@@ -214,9 +220,17 @@ window.__ModuleLoader__.load({
       'open': 'Open',
       'expandAll': 'Expand all',
       'collapseAll': 'Collapse all',
+      'expand': 'Expand',
+      'collapse': 'Collapse',
       'panel.enter': 'Enter jumps to the first result',
       'opening.title': 'Opening session…',
       'opening.tip': 'Longer histories take a moment',
+      'jump.title': 'Jumping to turn {turn}…',
+      'jump.hint': 'Locating and highlighting the match',
+      'global.legend': '▾ Expand / collapse 　 ↗ Click a paragraph to jump and highlight',
+      'global.refreshing': 'Rebuilding the index…',
+      'jump.label': 'Jump',
+      'jump.paraHint': 'Jump to this paragraph and highlight the match',
       'file.only': 'File',
       'global.refresh': 'Refresh index',
       'global.widen': 'Search all scopes',
@@ -297,7 +311,13 @@ window.__ModuleLoader__.load({
       '.dsh-cg-scope[aria-checked="true"]{border-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-brand-primary);background:rgba(74,144,255,.12);background:color-mix(in srgb,var(--dsw-alias-brand-primary) 10%,transparent)}',
       '.dsh-cg-body{flex:1;min-height:0;overflow-y:auto;width:100%;max-width:1080px;margin:0 auto;padding:6px 32px 48px;box-sizing:border-box}',
       '.dsh-cg-stats{display:flex;align-items:center;flex-wrap:wrap;gap:10px;padding:10px 2px;color:var(--dsw-alias-label-secondary);font-size:12px}',
-      '.dsh-cg-pulse{color:var(--dsw-alias-brand-primary)}',
+      '.dsh-cg-go{margin-left:auto;opacity:0;font-size:12px;color:var(--dsw-alias-brand-primary);transition:opacity .12s}',
+      '.dsh-cg-para:hover .dsh-cg-go,.dsh-cg-para:focus-visible .dsh-cg-go{opacity:1}',
+      '.dsh-cg-jump-btn{flex:none;height:22px;padding:0 8px;border:.5px solid var(--dsw-alias-border-l1);border-radius:999px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:11px;cursor:pointer}',
+      '.dsh-cg-jump-btn:hover{border-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-brand-primary)}',
+      '.dsh-cg-legend{padding:0 2px 8px;color:var(--dsw-alias-label-secondary);font-size:11px;opacity:.85}',
+      '.dsh-cg-spinner-sm{width:11px;height:11px;border-width:1.5px;margin-right:5px;vertical-align:-1px}',
+      '.dsh-cg-pulse{display:inline-flex;align-items:center;color:var(--dsw-alias-brand-primary)}',
       '.dsh-cg-tree{display:flex;flex-direction:column;gap:8px}',
       '.dsh-cg-session{border:.5px solid var(--dsw-alias-border-l1);border-radius:var(--dsw-radius-md,10px);background:var(--dsw-alias-bg-layer-1);overflow:hidden}',
       '.dsh-cg-session-head{display:flex;align-items:center;gap:8px;padding:8px 10px 8px 8px}',
@@ -423,14 +443,14 @@ window.__ModuleLoader__.load({
       '.dsh-csearch-hits{padding:0 6px;border-radius:999px;background:color-mix(in srgb,var(--dsw-alias-brand-primary) 12%,transparent);color:var(--dsw-alias-brand-primary)}',
       '.dsh-csearch-snippet{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;line-height:1.6;font-size:13px}',
       '.dsh-csearch-group mark,.dsh-csearch-snippet mark{padding:0 1px;border-radius:2px;background:rgba(74,144,255,.24);background:color-mix(in srgb,var(--dsw-alias-brand-primary) 26%,transparent);color:inherit}',
-      '.dsh-cg-mask{position:fixed;inset:0;z-index:1200;display:flex;align-items:flex-start;justify-content:center;padding:18vh 16px 0;background:rgba(18,20,24,.26);background:color-mix(in srgb,var(--dsw-alias-bg-base) 62%,transparent);cursor:progress;pointer-events:auto;animation:dsh-cg-mask-in .14s ease-out}',
-      '.dsh-cg-mask-card{display:flex;align-items:center;gap:12px;max-width:min(560px,90vw);padding:14px 18px;border:.5px solid var(--dsw-alias-border-l2);border-radius:14px;background:var(--dsw-alias-bg-overlay);box-shadow:0 18px 48px rgba(0,0,0,.18)}',
-      '.dsh-cg-spinner{flex:none;width:18px;height:18px;border-radius:50%;border:2px solid color-mix(in srgb,var(--dsw-alias-brand-primary) 25%,transparent);border-top-color:var(--dsw-alias-brand-primary);animation:dsh-cg-spin .8s linear infinite}',
-      '.dsh-cg-mask-text{display:flex;flex-direction:column;gap:2px;min-width:0}',
-      '.dsh-cg-mask-text strong{font-size:13px;font-weight:600;color:var(--dsw-alias-label-primary)}',
-      '.dsh-cg-mask-sub{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--dsw-alias-label-secondary)}',
+      /* The jump indicator: a non-blocking pill, so a click is acknowledged without a modal. */
+      '.dsh-cg-jump{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:1200;display:flex;align-items:center;gap:10px;max-width:min(520px,90vw);padding:9px 14px;border:.5px solid var(--dsw-alias-border-l2);border-radius:999px;background:var(--dsw-alias-bg-overlay);box-shadow:0 10px 30px rgba(0,0,0,.16);cursor:progress;pointer-events:none;animation:dsh-cg-mask-in .12s ease-out}',
+      '.dsh-cg-spinner{flex:none;width:16px;height:16px;border-radius:50%;border:2px solid color-mix(in srgb,var(--dsw-alias-brand-primary) 25%,transparent);border-top-color:var(--dsw-alias-brand-primary);animation:dsh-cg-spin .8s linear infinite}',
+      '.dsh-cg-mask-text{display:flex;flex-direction:column;gap:1px;min-width:0}',
+      '.dsh-cg-mask-text strong{font-size:12.5px;font-weight:600;color:var(--dsw-alias-label-primary)}',
+      '.dsh-cg-mask-sub{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px;color:var(--dsw-alias-label-secondary)}',
       '@keyframes dsh-cg-spin{to{transform:rotate(360deg)}}',
-      '@keyframes dsh-cg-mask-in{from{opacity:0}to{opacity:1}}',
+      '@keyframes dsh-cg-mask-in{from{opacity:0;transform:translate(-50%,-4px)}to{opacity:1;transform:translate(-50%,0)}}',
     ].join('\n')
 
     const EMPTY_RESULTS = { groups: [], matches: 0, truncated: false }
@@ -526,12 +546,18 @@ window.__ModuleLoader__.load({
     /** Readers currently showing a Session that may be asked to jump next. */
     const jumpListeners = new Set()
 
-    /** The frame-wide "opening a Session" transition, shared by the page and the mask. */
-    const openingState = { active: false, sessionId: '', title: '', token: 0, timer: null }
+    /** The frame-wide "opening a Session" transition, shared by the page and the jump pill. */
+    const openingState = { active: false, sessionId: '', title: '', kind: '', turn: null, token: 0, timer: null }
     const openingListeners = new Set()
 
     function openingSnapshot() {
-      return { active: openingState.active, token: openingState.token, title: openingState.title }
+      return {
+        active: openingState.active,
+        token: openingState.token,
+        title: openingState.title,
+        kind: openingState.kind,
+        turn: openingState.turn,
+      }
     }
 
     function publishOpening() {
@@ -550,12 +576,14 @@ window.__ModuleLoader__.load({
       return () => openingListeners.delete(listener)
     }
 
-    /** Announce one Session open; the mask appears only if it is still going after a beat. */
-    function beginOpening(sessionId, title) {
+    /** Announce one Session open (or one jump inside it) to the frame-wide indicator. */
+    function beginOpening(sessionId, title, target) {
       if (openingState.timer !== null) clearTimeout(openingState.timer)
       openingState.active = true
       openingState.sessionId = sessionId
       openingState.title = typeof title === 'string' ? title : ''
+      openingState.kind = target !== null && target !== undefined && typeof target.kind === 'string' ? target.kind : ''
+      openingState.turn = target !== null && target !== undefined && typeof target.turn === 'number' ? target.turn : null
       openingState.token += 1
       openingState.timer = setTimeout(() => {
         openingState.timer = null
@@ -572,6 +600,8 @@ window.__ModuleLoader__.load({
       if (!openingState.active) return
       openingState.active = false
       openingState.sessionId = ''
+      openingState.kind = ''
+      openingState.turn = null
       publishOpening()
     }
 
@@ -1593,8 +1623,8 @@ window.__ModuleLoader__.load({
         console.error('[conversation-search] uiWorkspace.openSession is unavailable')
         return
       }
-      /* Feedback first: the mask only appears if the open really takes a beat. */
-      beginOpening(sessionId, title)
+      /* Feedback first: the indicator appears at once, so the click is always acknowledged. */
+      beginOpening(sessionId, title, jump === null || jump === undefined ? null : { kind: jump.kind, turn: jump.turn })
       if (jump !== null && jump !== undefined) requestJump(sessionId, jump)
       try {
         /* Opening a Session also reveals the conversation panel (it selects the null panel id). */
@@ -2183,7 +2213,14 @@ window.__ModuleLoader__.load({
                       setAutoLoad(true)
                     },
                   },
-                  autoLoad || loadingOlder ? t('history.loading') : t('history.load'),
+                  autoLoad || loadingOlder
+                    ? h(
+                        'span',
+                        { className: 'dsh-csearch-loading' },
+                        h('span', { className: 'dsh-cg-spinner dsh-cg-spinner-sm', 'aria-hidden': 'true' }),
+                        t('history.loading'),
+                      )
+                    : t('history.load'),
                 ),
               )
             : null,
@@ -2209,6 +2246,7 @@ window.__ModuleLoader__.load({
       const [recent, setRecent] = useState(() => recentQueries.slice())
       const [filters, setFilters] = useState(() => defaultFilters())
       const [tick, setTick] = useState(0)
+      const [refreshing, setRefreshing] = useState(false)
       const abortRef = useRef(null)
       const inputRef = useRef(null)
       const bodyRef = useRef(null)
@@ -2253,6 +2291,7 @@ window.__ModuleLoader__.load({
               setRecent(recentQueries.slice())
               setResult(value)
               setStatus('ready')
+              setRefreshing(false)
               setError('')
               setExpanded(defaultOpen(value))
               globalMemory.result = value
@@ -2266,6 +2305,7 @@ window.__ModuleLoader__.load({
                   ? failure.message
                   : String(failure)
               setStatus('error')
+              setRefreshing(false)
               setError(message)
               globalMemory.status = 'error'
               globalMemory.error = message
@@ -2299,6 +2339,7 @@ window.__ModuleLoader__.load({
 
       const refresh = useCallback(() => {
         forceRefresh.current = true
+        setRefreshing(true)
         setTick((value) => value + 1)
       }, [])
 
@@ -2482,6 +2523,7 @@ window.__ModuleLoader__.load({
             className: 'dsh-cg-para',
             key: question.seq + ':' + paragraph.index,
             'data-csearch-row': '',
+            title: t('jump.paraHint'),
             onClick: () => openParagraph(session, paragraph),
           },
           h(
@@ -2491,6 +2533,7 @@ window.__ModuleLoader__.load({
             typeof paragraph.hits === 'number' && paragraph.hits > 1
               ? h('span', { className: 'dsh-cg-para-hits' }, t('global.paragraph.hits', { count: paragraph.hits }))
               : null,
+            h('span', { className: 'dsh-cg-go', 'aria-hidden': 'true' }, '↗'),
           ),
           fileOnly
             ? h(
@@ -2517,19 +2560,28 @@ window.__ModuleLoader__.load({
           { className: 'dsh-cg-q-text', title: question.text },
           markSegments(segmentsOf(question.text === '' ? t('global.question.empty') : question.text, resultWords)),
         )
-        const head = h(
-          'button',
-          {
-            type: 'button',
-            className: 'dsh-cg-question-toggle',
-            'data-csearch-row': '',
-            'aria-expanded': expandable ? open : undefined,
-            onClick: expandable ? () => toggle(openKey) : () => openQuestion(session, question),
-          },
-          expandable ? h(IconCaret, { className: 'dsh-cg-caret', open }) : null,
-          label,
-          text,
-        )
+        const head = expandable
+          ? h(
+              'button',
+              {
+                type: 'button',
+                className: 'dsh-cg-question-toggle',
+                'data-csearch-row': '',
+                'aria-expanded': open,
+                title: open ? t('collapse') : t('expand'),
+                onClick: () => toggle(openKey),
+              },
+              h(IconCaret, { className: 'dsh-cg-caret', open }),
+              label,
+              text,
+            )
+          : h(
+              'div',
+              { className: 'dsh-cg-question-toggle', 'data-csearch-row': '' },
+              h('span', { className: 'dsh-cg-caret-space' }),
+              label,
+              text,
+            )
         return h(
           'div',
           { className: 'dsh-cg-question', key: openKey },
@@ -2538,6 +2590,19 @@ window.__ModuleLoader__.load({
             { className: 'dsh-cg-question-row' },
             head,
             hidden > 0 ? h('span', { className: 'dsh-cg-hits' }, t('global.paragraph.more', { count: hidden })) : null,
+            expandable
+              ? null
+              : h(
+                  'button',
+                  {
+                    type: 'button',
+                    className: 'dsh-cg-jump-btn',
+                    title: t('jump.paraHint'),
+                    onClick: () => openQuestion(session, question),
+                  },
+                  '↗ ',
+                  t('jump.label'),
+                ),
           ),
           inputFiles.length === 0
             ? null
@@ -2581,18 +2646,26 @@ window.__ModuleLoader__.load({
           h(
             'div',
             { className: 'dsh-cg-session-top' },
-            h(
-              'button',
-              {
-                type: 'button',
-                className: 'dsh-cg-toggle',
-                'data-csearch-row': '',
-                'aria-expanded': canExpand ? open : undefined,
-                onClick: canExpand ? () => toggle(openKey) : () => openSession(session),
-              },
-              canExpand ? h(IconCaret, { className: 'dsh-cg-caret', open }) : h('span', { className: 'dsh-cg-caret-space' }),
-              h('span', { className: 'dsh-cg-session-title', title }, markSegments(segmentsOf(title, resultWords))),
-            ),
+            canExpand
+              ? h(
+                  'button',
+                  {
+                    type: 'button',
+                    className: 'dsh-cg-toggle',
+                    'data-csearch-row': '',
+                    'aria-expanded': open,
+                    title: open ? t('collapse') : t('expand'),
+                    onClick: () => toggle(openKey),
+                  },
+                  h(IconCaret, { className: 'dsh-cg-caret', open }),
+                  h('span', { className: 'dsh-cg-session-title', title }, markSegments(segmentsOf(title, resultWords))),
+                )
+              : h(
+                  'div',
+                  { className: 'dsh-cg-toggle', 'data-csearch-row': '' },
+                  h('span', { className: 'dsh-cg-caret-space' }),
+                  h('span', { className: 'dsh-cg-session-title', title }, markSegments(segmentsOf(title, resultWords))),
+                ),
             hits > 0 ? h('span', { className: 'dsh-cg-hits' }, t('global.resultCount', { count: hits })) : null,
             h('button', { type: 'button', className: 'dsh-cg-open', onClick: () => openSession(session) }, t('open')),
           ),
@@ -2647,7 +2720,12 @@ window.__ModuleLoader__.load({
           h('button', { type: 'button', className: 'dsh-cg-submit', onClick: submit }, t('global.retry')),
         )
       } else if (result === null) {
-        body = h('div', { className: 'dsh-cg-state' }, t('global.loading'))
+        body = h(
+          'div',
+          { className: 'dsh-cg-state' },
+          h('span', { className: 'dsh-cg-spinner', 'aria-hidden': 'true' }),
+          h('span', null, refreshing ? t('global.refreshing') : t('global.loading')),
+        )
       } else if (sessions.length === 0) {
         body = h(
           'div',
@@ -2759,7 +2837,14 @@ window.__ModuleLoader__.load({
                 h('span', { className: 'dsh-cg-stats-text' }, t('global.indexed', { count: stats.indexed })),
                 h('span', { className: 'dsh-cg-stats-text' }, t('global.scopeHint.' + scope)),
                 h('span', { className: 'dsh-cg-stats-text' }, filtersSummary(t, filters)),
-                status === 'loading' ? h('span', { className: 'dsh-cg-pulse' }, t('global.loading')) : null,
+                status === 'loading'
+                  ? h(
+                      'span',
+                      { className: 'dsh-cg-pulse' },
+                      h('span', { className: 'dsh-cg-spinner dsh-cg-spinner-sm', 'aria-hidden': 'true' }),
+                      refreshing ? t('global.refreshing') : t('global.loading'),
+                    )
+                  : null,
                 stats.truncated ? h('span', { className: 'dsh-cg-stats-text' }, t('global.truncated', { count: stats.sessions })) : null,
                 sessions.length === 0
                   ? null
@@ -2771,6 +2856,7 @@ window.__ModuleLoader__.load({
                       h('button', { type: 'button', className: 'dsh-cg-link', onClick: collapseAll }, t('collapseAll')),
                     ),
               ),
+          stats === null || sessions.length === 0 ? null : h('div', { className: 'dsh-cg-legend' }, t('global.legend')),
           body,
         ),
       )
@@ -2780,34 +2866,20 @@ window.__ModuleLoader__.load({
     function OpeningMask(props) {
       const t = props.t
       const [state, setState] = useState(openingSnapshot)
-      const [visible, setVisible] = useState(false)
 
       useEffect(() => onOpeningChange((next) => setState(next)), [])
 
-      /* A fast open must not flash a mask: only a real wait reveals it. */
-      useEffect(() => {
-        if (!state.active) {
-          setVisible(false)
-          return undefined
-        }
-        const timer = setTimeout(() => setVisible(true), OPENING_REVEAL_MS)
-        return () => clearTimeout(timer)
-      }, [state.active, state.token])
-
-      if (!visible || !state.active) return null
+      if (!state.active) return null
+      const heading = state.turn === null ? t('opening.title') : t('jump.title', { turn: state.turn })
       return h(
         'div',
-        { className: 'dsh-cg-mask', role: 'status', 'aria-live': 'polite' },
+        { className: 'dsh-cg-jump', role: 'status', 'aria-live': 'polite' },
+        h('span', { className: 'dsh-cg-spinner', 'aria-hidden': 'true' }),
         h(
           'div',
-          { className: 'dsh-cg-mask-card' },
-          h('span', { className: 'dsh-cg-spinner', 'aria-hidden': 'true' }),
-          h(
-            'div',
-            { className: 'dsh-cg-mask-text' },
-            h('strong', null, t('opening.title')),
-            h('span', { className: 'dsh-cg-mask-sub', title: state.title }, state.title === '' ? t('opening.tip') : state.title),
-          ),
+          { className: 'dsh-cg-mask-text' },
+          h('strong', null, heading),
+          h('span', { className: 'dsh-cg-mask-sub', title: state.title }, state.title === '' ? t('jump.hint') : state.title),
         ),
       )
     }

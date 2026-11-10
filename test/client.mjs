@@ -250,6 +250,14 @@ const zh = {
   'panel.scope.all': '全部',
   'panel.scope.question': '仅问题',
   'panel.scope.paragraph': '仅段落',
+  'jump.title': '正在跳到第 {turn} 轮…',
+  'jump.hint': '正在定位并高亮命中内容',
+  'jump.label': '跳转',
+  'jump.paraHint': '跳到这一段并高亮命中内容',
+  'global.legend': '▾ 展开 / 收起 　 ↗ 点击跳到该段落并高亮',
+  'global.refreshing': '正在重建索引…',
+  'expand': '展开',
+  'collapse': '收起',
   'global.question.label': '第 {number} 轮',
   'global.question.matched': '问题命中',
   'global.question.empty': '（无提问文本）',
@@ -581,6 +589,8 @@ check('stats line shown', pageText.includes('1 个会话 · 1 个问题 · 1 个
 check('file row is labelled', pageText.includes('文件'), pageText.slice(0, 400))
 check('refresh control shown', pageText.includes('刷新索引'))
 check('active scope hint shown', pageText.includes('任一命中'))
+check('the legend explains expand vs jump', pageText.includes('↗ 点击跳到该段落'), pageText.slice(0, 400))
+check('paragraph rows advertise the jump', findAll(pageTree, 'dsh-cg-go').length > 0)
 
 const sessionTitle = findNode(pageTree, 'dsh-cg-session-title')
 check('session title highlights the match', sessionTitle !== null && findTag(sessionTitle, 'mark') !== null)
@@ -643,7 +653,7 @@ check('opening watcher registered', watcher !== undefined)
 let maskTree = await settle('mask', overlay.Component, { t })
 check('mask hidden before any open', maskTree === null, JSON.stringify(flatten(maskTree)))
 
-/* Click a paragraph through the real opener: the mask must announce the wait. */
+/* Click a paragraph through the real opener: the indicator must name the jump. */
 const maskPageProps = { ...page.options.inject(), t, useSessions: (selector) => selector({ byId: {} }) }
 let maskPage = await settle('page-mask', page.Component, maskPageProps)
 const maskInput = findNode(maskPage, 'dsh-cg-input')
@@ -653,9 +663,9 @@ const maskParagraph = findNode(maskPage, 'dsh-cg-para')
 if (maskParagraph !== null) maskParagraph.props.onClick()
 maskTree = await settle('mask', overlay.Component, { t })
 const maskText = flatten(maskTree).join('|')
-check('mask revealed while opening', maskText.includes('正在打开会话'), maskText)
-check('mask names the session', maskText.includes('侧边栏宽度调整'), maskText)
-check('mask carries a live status role', maskTree !== null && maskTree.props.role === 'status')
+check('the jump indicator names the target turn', maskText.includes('正在跳到第 1 轮'), maskText)
+check('the jump indicator names the session', maskText.includes('侧边栏宽度调整'), maskText)
+check('the jump indicator carries a live status role', maskTree !== null && maskTree.props.role === 'status')
 
 /* The Session opening is only half the trip: a pending jump keeps the mask up. */
 renderComponent('watcher', watcher.Component, {
