@@ -2,7 +2,7 @@
 
 ## 1.1.1
 
-- 元数据：GitHub 账号改名（`yhaix` → `timefarer`）后，`repository` / `homepage` / `bugs` 与 README 里的链接同步到新地址。功能无变化。
+- 维护性发版：更新仓库元数据与文档链接，功能无变化。
 
 ## 1.1.0
 
