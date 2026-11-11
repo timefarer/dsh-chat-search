@@ -1,6 +1,6 @@
 # dsh-chat-search
 
-[![ci](https://github.com/yhaix/dsh-chat-search/actions/workflows/ci.yml/badge.svg)](https://github.com/yhaix/dsh-chat-search/actions/workflows/ci.yml)
+[![ci](https://github.com/timefarer/dsh-chat-search/actions/workflows/ci.yml/badge.svg)](https://github.com/timefarer/dsh-chat-search/actions/workflows/ci.yml)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 简体中文 | [English](README.en.md)
@@ -16,11 +16,11 @@
 
 **全局检索**：主内容区整页，范围胶囊 + 筛选窗口 + 会话 → 问题 → 段落三层结果。
 
-![全局检索](https://raw.githubusercontent.com/yhaix/dsh-chat-search/main/docs/global.png)
+![全局检索](https://raw.githubusercontent.com/timefarer/dsh-chat-search/main/docs/global.png)
 
 **会话内检索**：右侧栏面板，按轮次分组，显示命中的段落、文件名与命中次数。
 
-![会话内检索](https://raw.githubusercontent.com/yhaix/dsh-chat-search/main/docs/panel.png)
+![会话内检索](https://raw.githubusercontent.com/timefarer/dsh-chat-search/main/docs/panel.png)
 
 ## 为什么是它
 

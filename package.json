@@ -7,11 +7,11 @@
   "author": "Yu Hai",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yhaix/dsh-chat-search.git"
+    "url": "git+https://github.com/timefarer/dsh-chat-search.git"
   },
-  "homepage": "https://github.com/yhaix/dsh-chat-search#readme",
+  "homepage": "https://github.com/timefarer/dsh-chat-search#readme",
   "bugs": {
-    "url": "https://github.com/yhaix/dsh-chat-search/issues"
+    "url": "https://github.com/timefarer/dsh-chat-search/issues"
   },
   "keywords": [
     "deepseek-harness",

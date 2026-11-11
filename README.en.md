@@ -1,6 +1,6 @@
 # dsh-chat-search
 
-[![ci](https://github.com/yhaix/dsh-chat-search/actions/workflows/ci.yml/badge.svg)](https://github.com/yhaix/dsh-chat-search/actions/workflows/ci.yml)
+[![ci](https://github.com/timefarer/dsh-chat-search/actions/workflows/ci.yml/badge.svg)](https://github.com/timefarer/dsh-chat-search/actions/workflows/ci.yml)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 [简体中文](README.md) | English
@@ -19,12 +19,12 @@ with the matched words highlighted.
 **Global search**: a full page in the main area, with scope chips, the filter window, and the
 session → question → paragraph tree.
 
-![Global search](https://raw.githubusercontent.com/yhaix/dsh-chat-search/main/docs/global.png)
+![Global search](https://raw.githubusercontent.com/timefarer/dsh-chat-search/main/docs/global.png)
 
 **In-conversation search**: the right-sidebar panel, grouped by turn, showing the matched
 paragraphs, file names and hit counts.
 
-![In-conversation panel](https://raw.githubusercontent.com/yhaix/dsh-chat-search/main/docs/panel.png)
+![In-conversation panel](https://raw.githubusercontent.com/timefarer/dsh-chat-search/main/docs/panel.png)
 
 ## Why this one
 
