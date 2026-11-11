@@ -520,15 +520,40 @@ function liveMoved(ctx, cache) {
 /**
  * Fold one Session log into the tree the page renders.
  *
- * A human `user/message` opens a question; every `assistant/message` after it contributes its
- * text paragraphs to that question. Titles come from the last `session/title` event.
+ * DSH numbers Turns itself: `turn/start` carries `data.turn` and every `assistant/message`
+ * repeats it. A Turn is one row here, so the page shows the same 「第 N 轮」 the in-conversation
+ * panel reads from a Chat node's `location.turn.turn`. One Turn can hold several
+ * `user/message` events (a steering message); their texts stay as parts of that one question.
+ * Logs that predate Turn boundaries fall back to one question per user message, numbered in
+ * order — the behaviour older releases had.
  */
 function parseSession(id, header, events, signature) {
   let title = ''
   let chars = 0
   const questions = []
+  const byTurn = new Map()
+  const hasTurnBoundary = events.some(
+    (event) => event !== null && typeof event === 'object' && event.type === 'turn/start',
+  )
+  let currentTurn = null
   let current = null
+  let ordinal = 0
   const limit = Math.min(events.length, MAX_EVENTS_PER_SESSION)
+
+  /** The one question row of a Turn (created on first sight, keyed by its real number). */
+  const questionFor = (turn) => {
+    const known = byTurn.get(turn)
+    if (known !== undefined) return known
+    const question = { turn, seq: 0, time: 0, parts: [], paragraphs: [] }
+    byTurn.set(turn, question)
+    questions.push(question)
+    return question
+  }
+
+  const stamp = (question, event) => {
+    if (question.seq === 0 && typeof event.seq === 'number') question.seq = event.seq
+    if (question.time === 0 && typeof event.time === 'number') question.time = event.time
+  }
 
   for (let index = 0; index < limit; index += 1) {
     const event = events[index]
@@ -540,26 +565,52 @@ function parseSession(id, header, events, signature) {
       continue
     }
 
+    if (event.type === 'turn/start') {
+      const data = event.data !== null && typeof event.data === 'object' ? event.data : undefined
+      const turn = data !== undefined && typeof data.turn === 'number' ? data.turn : null
+      if (turn !== null) {
+        currentTurn = turn
+        current = questionFor(turn)
+        stamp(current, event)
+      }
+      continue
+    }
+
     if (event.type === 'user/message') {
-      const question = readQuestion(event)
-      if (question === null) continue
-      chars += question.text.length
-      questions.push(question)
+      const part = readQuestion(event)
+      if (part === null) continue
+      chars += part.text.length
+      let question
+      if (hasTurnBoundary && currentTurn !== null) {
+        question = questionFor(currentTurn)
+      } else {
+        ordinal += 1
+        question = questionFor(ordinal)
+      }
+      stamp(question, event)
+      question.parts.push(part)
       current = question
       continue
     }
 
     if (event.type === 'assistant/message') {
-      const message = event.data !== null && typeof event.data === 'object' ? event.data.message : undefined
+      const data = event.data !== null && typeof event.data === 'object' ? event.data : undefined
+      const message = data !== undefined ? data.message : undefined
       const content = message !== null && typeof message === 'object' ? message.content : undefined
       if (!Array.isArray(content)) continue
+      const turn = data !== undefined && typeof data.turn === 'number' ? data.turn : null
+      if (hasTurnBoundary && turn !== null) {
+        currentTurn = turn
+        current = questionFor(turn)
+      }
+      if (current === null) {
+        ordinal += 1
+        current = questionFor(hasTurnBoundary && turn !== null ? turn : ordinal)
+      }
+      stamp(current, event)
       const text = textOfBlocks(content)
       const files = outputFilesOf(content)
       if (text === '' && files.length === 0) continue
-      if (current === null) {
-        current = { seq: typeof event.seq === 'number' ? event.seq : 0, text: '', files: [], paragraphs: [] }
-        questions.push(current)
-      }
       const seq = typeof event.seq === 'number' ? event.seq : current.seq
       const paragraphs = splitParagraphs(text)
       for (let position = 0; position < paragraphs.length; position += 1) {
@@ -575,10 +626,17 @@ function parseSession(id, header, events, signature) {
     }
   }
 
+  /* A Turn that started and ended without any searchable content is not a row. */
+  const kept = questions.filter((question) => question.parts.length > 0 || question.paragraphs.length > 0)
   let displayTitle = title
   if (displayTitle === '') {
-    const first = questions.find((question) => question.text !== '')
-    if (first !== undefined) displayTitle = previewTitle(first.text)
+    for (const question of kept) {
+      const first = question.parts.find((part) => part.text !== '')
+      if (first !== undefined) {
+        displayTitle = previewTitle(first.text)
+        break
+      }
+    }
   }
 
   return {
@@ -589,7 +647,7 @@ function parseSession(id, header, events, signature) {
     displayTitle,
     signature,
     chars,
-    questions,
+    questions: kept,
   }
 }
 
@@ -857,10 +915,28 @@ function searchCorpus(corpus, query, scope, started, filters) {
       for (let turnIndex = firstTurn; turnIndex < entry.questions.length; turnIndex += 1) {
         const question = entry.questions[turnIndex]
         if (!inWindow(question.time, sinceMs, untilMs)) continue
-        const questionNumber = turnIndex + 1
-        const questionTextMatched = spec.question && containsAll(question.text, words)
-        const questionFiles = spec.question ? matchesFiles(question.files, words) : []
-        const questionMatched = questionTextMatched || questionFiles.length > 0
+        /* The Turn number DSH itself shows; the panel reads the same number off its Chat nodes. */
+        const questionNumber = question.turn
+        const parts = question.parts
+        const partTextHit = spec.question
+          ? parts.find((part) => part.text !== '' && containsAll(part.text, words))
+          : undefined
+        const partFileHit = spec.question
+          ? parts.find((part) => matchesFiles(part.files, words).length > 0)
+          : undefined
+        const matchedPart = partTextHit !== undefined ? partTextHit : partFileHit
+        const questionMatched = matchedPart !== undefined
+        /* Input files are display metadata: keep them for every scope, match them only for question scope. */
+        const questionFiles = []
+        for (const part of parts) {
+          for (const name of part.files) pushUnique(questionFiles, name, MAX_FILES)
+        }
+        /* A jump targets the user message that actually matched, not simply the first one. */
+        const anchorPart = matchedPart !== undefined ? matchedPart : parts[0]
+        const anchorText = anchorPart === undefined ? '' : anchorPart.text
+        const anchor = anchorText !== '' ? anchorText.slice(0, ANCHOR_CHARS) : anchorPart === undefined ? '' : anchorPart.files[0] || ''
+        const questionSeq = anchorPart === undefined ? question.seq : anchorPart.seq
+        const matchedFiles = matchedPart !== undefined && spec.question ? matchesFiles(matchedPart.files, words) : []
         const paragraphs = []
         for (let index = 0; index < question.paragraphs.length; index += 1) {
           const paragraph = question.paragraphs[index]
@@ -884,14 +960,14 @@ function searchCorpus(corpus, query, scope, started, filters) {
         }
         if (!questionMatched && paragraphs.length === 0) continue
         questions.push({
-          seq: question.seq,
+          seq: questionSeq,
           number: questionNumber,
-          anchor: question.text.slice(0, ANCHOR_CHARS),
-          text: question.text === '' ? '' : snippetOf(question.text, words, QUESTION_CHARS),
+          anchor,
+          text: anchorText === '' ? '' : snippetOf(anchorText, words, QUESTION_CHARS),
           matched: questionMatched,
-          textMatched: questionTextMatched,
-          inputFiles: question.files,
-          matchedFiles: questionFiles,
+          textMatched: partTextHit !== undefined,
+          inputFiles: questionFiles,
+          matchedFiles,
           paragraphTotal: question.paragraphs.length,
           paragraphs: paragraphs.slice(0, MAX_RESULT_PARAGRAPHS),
         })
