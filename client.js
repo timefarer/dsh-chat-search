@@ -17,7 +17,7 @@ window.__ModuleLoader__.load({
     /** Custom Highlight name for the arrival marker. */
     const HIGHLIGHT = 'dsh-chat-search'
     /** Shown in the UI so a stale client module is visible at a glance; test/build asserts it. */
-    const BUILD = 'v1.1.0'
+    const BUILD = 'v1.1.1'
 
     /** Diagnostics are off unless the reader opts in from DevTools. */
     function debugEnabled() {

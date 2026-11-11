@@ -1,6 +1,6 @@
 {
   "name": "dsh-chat-search",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "DeepSeek Harness（dsh）对话检索插件：按段落与文件名检索当前或全部会话，支持日期/轮次筛选、三层结果、跳转与高亮。",
   "type": "module",
   "license": "MIT",
