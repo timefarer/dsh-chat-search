@@ -910,10 +910,13 @@ function searchCorpus(corpus, query, scope, started, filters) {
     for (const entry of corpus.values()) {
       const sessionMatched = spec.session && containsAll(entry.title, words)
       const questions = []
-      /* Only the last N Turns of each Session are candidates; the date window narrows further. */
-      const firstTurn = turnLimit > 0 ? Math.max(0, entry.questions.length - turnLimit) : 0
-      for (let turnIndex = firstTurn; turnIndex < entry.questions.length; turnIndex += 1) {
-        const question = entry.questions[turnIndex]
+      /* Only the last N Turns of each Session are candidates; the date window narrows further.
+         The window is computed from Turn NUMBERS, exactly like the panel's maxTurn - N + 1, so a
+         Turn gap (an aborted Turn yields no row) cannot shift the two windows apart. */
+      const lastTurn = entry.questions.length === 0 ? -1 : entry.questions[entry.questions.length - 1].turn
+      const minTurn = turnLimit > 0 && lastTurn >= 0 ? lastTurn - turnLimit + 1 : Number.NEGATIVE_INFINITY
+      for (const question of entry.questions) {
+        if (question.turn < minTurn) continue
         if (!inWindow(question.time, sinceMs, untilMs)) continue
         /* The Turn number DSH itself shows; the panel reads the same number off its Chat nodes. */
         const questionNumber = question.turn

@@ -133,6 +133,12 @@ const logs = [
       replies: ['无提问轮的段落锚点。'],
     },
   ]),
+  /* Turn numbers with gaps: an aborted Turn leaves no row, but the numbers stay real. */
+  makeTurnSession('s6', '轮次间隙验证', [
+    { number: 1, users: ['间隙一的提问'], replies: ['丁段回复。'] },
+    { number: 4, users: ['间隙四的提问'], replies: ['戊段回复。'] },
+    { number: 9, users: ['间隙九的提问'], replies: ['己段回复。'] },
+  ]),
 ]
 
 const registered = []
@@ -340,6 +346,31 @@ check(
   JSON.stringify([emptyQuestion.number, emptyQuestion.paragraphs.length]),
 )
 check('turns: it has no question text or question hit', emptyQuestion.matched === false && emptyQuestion.text === '')
+
+/* A turn limit is counted in Turn numbers (maxTurn - N + 1), not in surviving rows. */
+const gapWindow = await post({
+  action: 'search',
+  query: '己段回复',
+  scope: 'paragraph',
+  filters: { since: '', until: '', turns: 2 },
+})
+const gapQuestion = gapWindow.body.value.sessions[0] === undefined ? null : gapWindow.body.value.sessions[0].questions[0]
+check(
+  'turns: a 2-Turn window keeps the real Turn 9',
+  gapQuestion !== null && gapQuestion.number === 9,
+  JSON.stringify(gapQuestion && gapQuestion.number),
+)
+const gapDropped = await post({
+  action: 'search',
+  query: '戊段回复',
+  scope: 'paragraph',
+  filters: { since: '', until: '', turns: 2 },
+})
+check(
+  'turns: the same window drops Turn 4',
+  gapDropped.body.value.sessions.length === 0,
+  JSON.stringify(gapDropped.body.value.sessions.map((s) => s.id)),
+)
 
 // #endregion
 
