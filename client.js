@@ -16,8 +16,12 @@ window.__ModuleLoader__.load({
     const TAB_KIND = 'conversation-search'
     /** Custom Highlight name for the arrival marker. */
     const HIGHLIGHT = 'dsh-chat-search'
+    /** Custom Highlight name for the paragraph the jump landed on (a different colour from HIGHLIGHT). */
+    const SELECTED = 'dsh-chat-search-selected'
+    /** How much of a paragraph's text identifies it, matching the Host's ANCHOR_CHARS. */
+    const PARAGRAPH_ANCHOR_CHARS = 80
     /** Shown in the UI so a stale client module is visible at a glance; test/build asserts it. */
-    const BUILD = 'v1.1.1'
+    const BUILD = 'v1.2.0'
 
     /** Diagnostics are off unless the reader opts in from DevTools. */
     function debugEnabled() {
@@ -427,6 +431,8 @@ window.__ModuleLoader__.load({
       '.dsh-csearch-files{display:flex;flex-wrap:wrap;gap:4px}',
       '.dsh-csearch-file{max-width:100%;padding:1px 7px;border:.5px solid var(--dsw-alias-border-l1);border-radius:999px;color:var(--dsw-alias-label-secondary);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
       '::highlight(dsh-chat-search){background-color:rgba(255,199,0,.5);color:inherit}',
+      '::highlight(dsh-chat-search-selected){background-color:rgba(74,144,255,.18);color:inherit}',
+      '[data-dsh-csearch-selected]{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:3px;border-radius:4px}',
       '.dsh-csearch-highlight-layer{position:fixed;inset:0;z-index:900;pointer-events:none;overflow:hidden}',
       '.dsh-csearch-highlight{position:absolute;border-radius:2px;background:rgba(255,199,0,.5)}',
       '.dsh-csearch-results{display:flex;flex-direction:column;gap:2px}',
@@ -499,9 +505,13 @@ window.__ModuleLoader__.load({
     const panelSearches = new Map()
     const panelSearchListeners = new Set()
 
-    function requestPanelSearch(sessionId, query, scope) {
+    function requestPanelSearch(sessionId, query, scope, filters) {
       if (typeof query !== 'string' || query.trim() === '') return
-      panelSearches.set(sessionId, { query, scope: typeof scope === 'string' ? scope : 'all' })
+      panelSearches.set(sessionId, {
+        query,
+        scope: typeof scope === 'string' ? scope : 'all',
+        filters: filters === undefined || filters === null ? null : normalizeFilters(filters),
+      })
       for (const listener of panelSearchListeners) {
         try {
           listener(sessionId)
@@ -987,12 +997,23 @@ window.__ModuleLoader__.load({
       }
       const minTurn = turnLimit > 0 && maxTurn >= 0 ? maxTurn - turnLimit + 1 : Number.NEGATIVE_INFINITY
       const groups = []
+      /* One header per Turn: the first question asked in it, exactly like the Host shows it. */
+      const turnQuestions = new Map()
+      for (const key of order) {
+        const node = nodes.get(key)
+        const located = node === undefined ? null : turnOf(node)
+        if (located === null || turnQuestions.has(located)) continue
+        if (roleOf(node) !== 'user') continue
+        const content = textOfNode(node, 'user')
+        if (content.text === '' && content.files.length === 0) continue
+        turnQuestions.set(located, previewLine(content.text === '' ? content.files.join(' ') : content.text))
+      }
+      /* Paragraph numbers continue across every reply message of a Turn, like the Host corpus. */
+      const turnOffsets = new Map()
       let group = null
       let matches = 0
       let truncated = false
       let turn = 0
-      let question = ''
-      let questionTurn = null
 
       for (let index = 0; index < order.length; index += 1) {
         const node = nodes.get(order[index])
@@ -1006,11 +1027,9 @@ window.__ModuleLoader__.load({
         if (only !== null && role !== only) continue
         const content = textOfNode(node, role)
         if (content.text === '' && content.files.length === 0) continue
-        if (role === 'user') {
-          question = previewLine(content.text === '' ? content.files.join(' ') : content.text)
-          questionTurn = turn
-        }
         const units = messageUnits(node, content.text, content.files)
+        const base = role === 'assistant' ? turnOffsets.get(turn) || 0 : 0
+        if (role === 'assistant') turnOffsets.set(turn, base + units.length)
         for (const unit of units) {
           const textMatched = unit.text !== '' && containsAll(unit.text, words)
           const fileHits = matchesFiles(unit.files, words)
@@ -1020,15 +1039,16 @@ window.__ModuleLoader__.load({
             break
           }
           if (group === null || group.turn !== turn) {
-            group = { turn, question: questionTurn === turn ? question : '', items: [] }
+            group = { turn, question: turnQuestions.get(turn) || '', items: [] }
             groups.push(group)
           }
           group.items.push({
             key: node.key,
             role,
-            index: unit.index,
+            index: role === 'assistant' ? base + unit.index : unit.index,
             kind: unit.kind,
             total: units.length,
+            anchor: unit.kind === 'file' ? unit.files[0] || '' : unit.text.slice(0, PARAGRAPH_ANCHOR_CHARS),
             hits: (textMatched ? countHits(unit.text, words) : 0) + fileHits.length,
             textMatched,
             files: unit.files,
@@ -1103,6 +1123,20 @@ window.__ModuleLoader__.load({
       return null
     }
 
+    /** The scrollport to clip markers to: a scrolling ancestor, else the host's known chat scroller. */
+    function conversationScrollerOf(row) {
+      const found = scrollerOf(row)
+      if (found !== null) return found
+      try {
+        if (row !== null && row !== undefined && typeof row.closest === 'function') {
+          return row.closest('[data-conversation-scroll]')
+        }
+      } catch (error) {
+        /* A detached row has no host ancestor. */
+      }
+      return null
+    }
+
     function prefersReducedMotion() {
       try {
         return window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -1151,6 +1185,15 @@ window.__ModuleLoader__.load({
     let highlightBoxes = []
     let highlightRanges = []
     let highlightFrame = 0
+    /** The scrollport the fallback boxes are clipped to (the conversation, never the window). */
+    let highlightScroller = null
+    /** Watches the scrollport and the composer seat so a resize repaints instead of drifting. */
+    let highlightObserver = null
+    /** The paragraph the jump landed on, marked apart from the keyword highlight. */
+    let selectedRange = null
+    let selectedBlock = null
+    let selectedAnchor = ''
+    let selectedRow = null
 
     /** Native text highlight: the browser-find look, anchored to the text so it scrolls with it. */
     function applyNativeHighlight(ranges) {
@@ -1175,9 +1218,45 @@ window.__ModuleLoader__.load({
       }
     }
 
-    /** Move the fallback boxes onto their ranges' current viewport position. */
+    /**
+     * The viewport rectangle the fallback marker may paint in.
+     *
+     * A `position: fixed` box does not follow the scrollport's clipping: once the text it marks
+     * scrolls under the composer or out of the conversation, the box would still hang there.
+     * Clamp to the conversation scrollport and stop at the composer seat.
+     */
+    function overlayClip() {
+      const view = { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight }
+      const scroller = highlightScroller
+      if (scroller === null) return view
+      let rect
+      try {
+        rect = scroller.getBoundingClientRect()
+      } catch (error) {
+        return view
+      }
+      let bottom = rect.bottom
+      try {
+        const seat = typeof scroller.querySelector === 'function' ? scroller.querySelector('[data-composer-seat]') : null
+        if (seat !== null) {
+          const seatRect = seat.getBoundingClientRect()
+          if (seatRect.height > 0 || seatRect.top > rect.top) bottom = Math.min(bottom, seatRect.top)
+        }
+      } catch (error) {
+        /* The composer seat is optional; the scrollport alone still clips the marker. */
+      }
+      return {
+        left: Math.max(view.left, rect.left),
+        top: Math.max(view.top, rect.top),
+        right: Math.min(view.right, rect.right),
+        bottom: Math.min(view.bottom, bottom),
+      }
+    }
+
+    /** Move the fallback boxes onto their ranges' current position, clipped to the scrollport. */
     function positionOverlay() {
       highlightFrame = 0
+      const clip = overlayClip()
       for (let index = 0; index < highlightBoxes.length; index += 1) {
         const box = highlightBoxes[index]
         const range = highlightRanges[index]
@@ -1192,10 +1271,18 @@ window.__ModuleLoader__.load({
           box.style.display = 'none'
           continue
         }
+        const left = Math.max(rect.left, clip.left)
+        const top = Math.max(rect.top, clip.top)
+        const right = Math.min(rect.right, clip.right)
+        const bottom = Math.min(rect.bottom, clip.bottom)
+        if (right - left < 1 || bottom - top < 1) {
+          box.style.display = 'none'
+          continue
+        }
         box.style.display = ''
-        box.style.transform = `translate(${Math.round(rect.left)}px, ${Math.round(rect.top)}px)`
-        box.style.width = `${Math.ceil(rect.width)}px`
-        box.style.height = `${Math.ceil(rect.height)}px`
+        box.style.transform = `translate(${Math.round(left)}px, ${Math.round(top)}px)`
+        box.style.width = `${Math.ceil(right - left)}px`
+        box.style.height = `${Math.ceil(bottom - top)}px`
       }
     }
 
@@ -1220,6 +1307,16 @@ window.__ModuleLoader__.load({
       if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
         window.removeEventListener('resize', scheduleOverlay)
       }
+      if (highlightObserver !== null) {
+        const observer = highlightObserver
+        highlightObserver = null
+        try {
+          observer.disconnect()
+        } catch (error) {
+          /* An observer on a removed element is harmless. */
+        }
+      }
+      highlightScroller = null
       highlightBoxes = []
       highlightRanges = []
       if (highlightLayer !== null) {
@@ -1234,7 +1331,7 @@ window.__ModuleLoader__.load({
     }
 
     /** Fallback marker for a build without the Custom Highlight API: boxes that follow scrolling. */
-    function paintOverlay(ranges) {
+    function paintOverlay(ranges, scroller) {
       detachOverlay()
       if (ranges.length === 0) return
       if (typeof document === 'undefined' || !document.body) return
@@ -1254,23 +1351,187 @@ window.__ModuleLoader__.load({
         highlightRanges.push(range)
       }
       highlightLayer = layer
+      highlightScroller = scroller === undefined ? null : scroller
       if (typeof document.addEventListener === 'function') {
         document.addEventListener('scroll', scheduleOverlay, { capture: true, passive: true })
       }
       if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
         window.addEventListener('resize', scheduleOverlay)
       }
+      if (highlightScroller !== null && typeof ResizeObserver === 'function') {
+        try {
+          highlightObserver = new ResizeObserver(() => scheduleOverlay())
+          highlightObserver.observe(highlightScroller)
+          const seat = typeof highlightScroller.querySelector === 'function'
+            ? highlightScroller.querySelector('[data-composer-seat]')
+            : null
+          if (seat !== null) highlightObserver.observe(seat)
+        } catch (error) {
+          highlightObserver = null
+        }
+      }
       positionOverlay()
     }
 
-    /** Remove the arrival marker (native and fallback). It stays until the search changes. */
+    /** Native selection highlight: a blue wash over the whole paragraph, under the amber words. */
+    function applyNativeSelection(range) {
+      if (range === null) return false
+      if (typeof Highlight === 'undefined') return false
+      if (typeof CSS === 'undefined' || !CSS || !CSS.highlights || typeof CSS.highlights.set !== 'function') return false
+      try {
+        CSS.highlights.set(SELECTED, new Highlight(range))
+        return true
+      } catch (error) {
+        return false
+      }
+    }
+
+    function clearNativeSelection() {
+      try {
+        if (typeof CSS !== 'undefined' && CSS && CSS.highlights && typeof CSS.highlights.delete === 'function') {
+          CSS.highlights.delete(SELECTED)
+        }
+      } catch (error) {
+        /* Nothing to clear without the API. */
+      }
+    }
+
+    /** Collapse one rendered row's text, keeping a map back to its text nodes. */
+    function normalizedTextMap(root) {
+      if (typeof document.createTreeWalker !== 'function' || typeof NodeFilter === 'undefined') return null
+      let walker
+      try {
+        walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null)
+      } catch (error) {
+        return null
+      }
+      const map = []
+      let text = ''
+      let pendingSpace = false
+      let node = walker.nextNode()
+      while (node !== null) {
+        const value = node.nodeValue || ''
+        for (let offset = 0; offset < value.length; offset += 1) {
+          const char = value[offset]
+          if (/\s/.test(char)) {
+            if (text !== '') pendingSpace = true
+            continue
+          }
+          if (pendingSpace) {
+            text += ' '
+            map.push({ node, offset })
+            pendingSpace = false
+          }
+          text += char
+          map.push({ node, offset })
+        }
+        node = walker.nextNode()
+      }
+      return { text, map }
+    }
+
+    /** A range covering the paragraph that starts with `anchor` inside one rendered message row. */
+    function paragraphRange(row, anchor) {
+      const needle = normalizeAnchor(anchor)
+      if (needle === '') return null
+      const built = normalizedTextMap(row)
+      if (built === null || built.map.length === 0) return null
+      const at = built.text.toLowerCase().indexOf(needle)
+      if (at < 0) return null
+      const start = built.map[at]
+      const end = built.map[Math.min(built.map.length - 1, at + needle.length - 1)]
+      if (start === undefined || end === undefined) return null
+      try {
+        const range = document.createRange()
+        range.setStart(start.node, start.offset)
+        range.setEnd(end.node, end.offset + 1)
+        return range
+      } catch (error) {
+        return null
+      }
+    }
+
+    /** Fallback for a build without the Custom Highlight API: outline the paragraph's block. */
+    function markParagraphBlock(row, anchor) {
+      const needle = normalizeAnchor(anchor)
+      if (needle === '' || typeof row.querySelectorAll !== 'function') return false
+      let match = null
+      let matchLength = 0
+      for (const element of row.querySelectorAll('p,li,pre,blockquote,td,th,h1,h2,h3,h4,h5,h6')) {
+        const text = typeof element.textContent === 'string' ? element.textContent.toLowerCase().replace(/\s+/g, ' ').trim() : ''
+        if (text.indexOf(needle) < 0) continue
+        if (match === null || text.length < matchLength) {
+          match = element
+          matchLength = text.length
+        }
+      }
+      if (match === null || typeof match.setAttribute !== 'function') return false
+      try {
+        match.setAttribute('data-dsh-csearch-selected', 'true')
+        selectedBlock = match
+        return true
+      } catch (error) {
+        return false
+      }
+    }
+
+    /** Drop the paragraph selection (native wash, fallback outline and the remembered range). */
+    function clearSelection() {
+      clearNativeSelection()
+      selectedRange = null
+      selectedAnchor = ''
+      selectedRow = null
+      if (selectedBlock !== null && typeof selectedBlock.removeAttribute === 'function') {
+        try {
+          selectedBlock.removeAttribute('data-dsh-csearch-selected')
+        } catch (error) {
+          /* The node may have been replaced by a re-render. */
+        }
+      }
+      selectedBlock = null
+      try {
+        if (typeof document.querySelectorAll === 'function') {
+          for (const element of document.querySelectorAll('[data-dsh-csearch-selected]')) {
+            if (typeof element.removeAttribute === 'function') element.removeAttribute('data-dsh-csearch-selected')
+          }
+        }
+      } catch (error) {
+        /* No document to sweep. */
+      }
+    }
+
+    /** Mark the landed paragraph; a no-op when the anchor is empty (a question-level jump). */
+    function paintSelection(row, anchor) {
+      const wanted = typeof anchor === 'string' ? anchor : ''
+      if (wanted !== '' && wanted === selectedAnchor && selectedRow === row && selectedRange !== null && rangesAlive([selectedRange])) {
+        return true
+      }
+      clearSelection()
+      if (wanted === '') return false
+      const range = paragraphRange(row, wanted)
+      if (range !== null && applyNativeSelection(range)) {
+        selectedRange = range
+        selectedAnchor = wanted
+        selectedRow = row
+        return true
+      }
+      const marked = markParagraphBlock(row, wanted)
+      if (marked) {
+        selectedAnchor = wanted
+        selectedRow = row
+      }
+      return marked
+    }
+
+    /** Remove every arrival marker (keywords + paragraph selection). It stays until the search changes. */
     function clearHighlight() {
       clearNativeHighlight()
+      clearSelection()
       detachOverlay()
     }
 
     /** The ranges painted last, so a replay can tell "still valid" from "a re-render killed them". */
-    let lastPaint = { key: '', ranges: [] }
+    let lastPaint = { key: '', ranges: [], anchor: '' }
 
     function rangesAlive(ranges) {
       if (ranges.length === 0) return false
@@ -1282,20 +1543,28 @@ window.__ModuleLoader__.load({
       return true
     }
 
-    /** Mark the matched words in one row: native text highlight when possible, boxes otherwise. */
-    function paintHighlight(row, words, scroller) {
+    /**
+     * Mark one row: the landed paragraph first (blue), then the matched words (amber).
+     *
+     * Registration order is the paint order of Custom Highlights, so the amber words stay
+     * readable on top of the blue paragraph wash instead of being tinted by it.
+     */
+    function paintHighlight(row, words, scroller, anchor) {
+      paintSelection(row, anchor)
       const ranges = wordRanges(row, words)
+      /* An empty word list must retire the previous keyword marker instead of leaving it behind. */
+      if (ranges.length === 0) clearNativeHighlight()
       const native = applyNativeHighlight(ranges)
       if (native) detachOverlay()
-      else paintOverlay(ranges)
-      debugLog('highlight', { ranges: ranges.length, native })
+      else paintOverlay(ranges, scroller)
+      debugLog('highlight', { ranges: ranges.length, native, selected: selectedRange !== null })
       return ranges
     }
 
     /** Scroll and mark one row at its CURRENT position. */
-    function scrollAndPaint(row, words) {
-      const scroller = scrollerOf(row)
-      const ranges = paintHighlight(row, words, scroller)
+    function scrollAndPaint(row, words, anchor) {
+      const scroller = conversationScrollerOf(row)
+      const ranges = paintHighlight(row, words, scroller, anchor)
       if (scroller !== null) {
         const rect = ranges.length > 0 ? ranges[0].getBoundingClientRect() : row.getBoundingClientRect()
         centerInScroller(scroller, rect.top, rect.height)
@@ -1305,16 +1574,16 @@ window.__ModuleLoader__.load({
       return ranges
     }
 
-    /** Scroll the conversation to one message and mark the matched words. */
-    function jumpToNode(nodeKey, words) {
+    /** Scroll the conversation to one message, mark the paragraph and the matched words. */
+    function jumpToNode(nodeKey, words, anchor) {
       const rows = rowsOf(nodeKey)
       const row = rows[0]
       if (row === undefined) {
         debugLog('jump: row not rendered', nodeKey)
         return false
       }
-      lastPaint = { key: nodeKey, ranges: scrollAndPaint(row, words) }
-      replayLanding(nodeKey, words)
+      lastPaint = { key: nodeKey, ranges: scrollAndPaint(row, words, anchor), anchor }
+      replayLanding(nodeKey, words, anchor)
       return true
     }
 
@@ -1326,7 +1595,7 @@ window.__ModuleLoader__.load({
      * a healthy highlight is what made it look like it was flashing, and re-scrolling on every
      * pass made the page bounce.
      */
-    function replayLanding(nodeKey, words) {
+    function replayLanding(nodeKey, words, anchor) {
       for (const delay of [120, 400, 900, 1500]) {
         setTimeout(() => {
           if (lastPaint.key !== nodeKey || !rangesAlive(lastPaint.ranges)) {
@@ -1334,8 +1603,8 @@ window.__ModuleLoader__.load({
             const row = rows[0]
             if (row === undefined) return
             /* Only the first pass scrolls; later passes exist for the marker alone. */
-            const ranges = paintHighlight(row, words, scrollerOf(row))
-            lastPaint = { key: nodeKey, ranges }
+            const ranges = paintHighlight(row, words, conversationScrollerOf(row), anchor)
+            lastPaint = { key: nodeKey, ranges, anchor }
           }
         }, delay)
       }
@@ -1345,21 +1614,52 @@ window.__ModuleLoader__.load({
 
     // #region Right sidebar entry points
 
+    /** How long one jump-requested panel open keeps retrying across a Session switch. */
+    const PANEL_OPEN_TIMEOUT_MS = 10_000
     /** Pending retry timers for a tab that is asked for before the sidebar is ready. */
     const tabRetries = new Map()
+    /** Jump-requested panel opens, alive until the panel confirms it mounted (or the deadline). */
+    const panelOpens = new Map()
+
+    function requestPanelOpen(sessionId) {
+      panelOpens.set(sessionId, Date.now() + PANEL_OPEN_TIMEOUT_MS)
+    }
+
+    /** The deadline of a pending open, or 0 when there is none (and cleaning up an expired one). */
+    function panelOpenWanted(sessionId) {
+      const until = panelOpens.get(sessionId)
+      if (until === undefined) return 0
+      if (Date.now() > until) {
+        panelOpens.delete(sessionId)
+        return 0
+      }
+      return until
+    }
+
+    function panelOpenDeadline(sessionId) {
+      return panelOpens.get(sessionId) || 0
+    }
+
+    /** The panel itself is the only proof that the request succeeded. */
+    function markPanelOpen(sessionId) {
+      panelOpens.delete(sessionId)
+    }
 
     /**
      * Open the search tab for one Session and ask its panel for focus.
      *
      * Right after a session switch the sidebar registries can still be mid-mount, so a failed
-     * attempt is retried briefly instead of dropping the request.
+     * attempt is retried until `until` instead of being dropped after a fixed number of tries.
      */
     function openSearchTab(ctx, sessionId, options) {
       const focus = options === undefined || options === null || options.focus !== false
+      const until = options !== undefined && options !== null && typeof options.until === 'number'
+        ? options.until
+        : Date.now() + 1_100
       const pending = tabRetries.get(sessionId)
       if (pending !== undefined) clearTimeout(pending)
 
-      const attempt = (remaining) => {
+      const attempt = () => {
         const tabs = ctx.get('sidebarRightTabs')
         const sidebar = ctx.get('sidebarRight')
         const ready = Boolean(tabs) && typeof tabs.get === 'function' && tabs.get(TAB_KIND) !== undefined && Boolean(sidebar)
@@ -1382,17 +1682,17 @@ window.__ModuleLoader__.load({
             }
           }
         }
-        if (remaining <= 0) {
+        if (Date.now() >= until) {
           tabRetries.delete(sessionId)
           console.warn('[conversation-search] the right-sidebar tab is still unavailable')
           return
         }
         tabRetries.set(
           sessionId,
-          setTimeout(() => attempt(remaining - 1), 180),
+          setTimeout(attempt, 180),
         )
       }
-      attempt(6)
+      attempt()
     }
 
     /** Bind Ctrl/Cmd+F to the in-conversation search, preferring the app's shortcut registry. */
@@ -1622,6 +1922,7 @@ window.__ModuleLoader__.load({
         kind: jump.kind,
         words: jump.words,
         anchor: typeof jump.anchor === 'string' ? jump.anchor : '',
+        paragraph: typeof jump.paragraph === 'string' ? jump.paragraph : '',
         turn: typeof jump.turn === 'number' ? jump.turn : undefined,
         tries: 0,
         at: Date.now(),
@@ -1691,8 +1992,11 @@ window.__ModuleLoader__.load({
       if (jump !== null && jump !== undefined && typeof jump.seq === 'number') requestThrough(ctx, sessionId, jump.seq)
       /* Mirror the page's query into the panel so both entries behave the same afterwards. */
       if (jump !== null && jump !== undefined && typeof jump.query === 'string' && jump.query.trim() !== '') {
-        requestPanelSearch(sessionId, jump.query, panelScopeOf(jump.scope))
-        openSearchTab(ctx, sessionId, { focus: false })
+        requestPanelSearch(sessionId, jump.query, panelScopeOf(jump.scope), jump.filters)
+        /* Opening the tab right away is only the fast path: a cross-Session switch can remount the
+           sidebar after this call, so the request stays pending until the Session is actually open. */
+        requestPanelOpen(sessionId)
+        openSearchTab(ctx, sessionId, { focus: false, until: panelOpenDeadline(sessionId) })
       }
     }
 
@@ -1954,6 +2258,11 @@ window.__ModuleLoader__.load({
         })
       }, [sessionId])
 
+      /* The panel being on screen is the only acknowledgement a jump-requested open needs. */
+      useEffect(() => {
+        markPanelOpen(sessionId)
+      }, [sessionId])
+
       /* A global jump mirrors itself here: same words, same window, same landing. */
       useEffect(() => {
         const apply = (request) => {
@@ -1962,6 +2271,8 @@ window.__ModuleLoader__.load({
           setQuery(request.query)
           storeQuery(sessionId, request.query)
           setScope(request.scope)
+          /* Same window as the page that jumped, or the two trees would show different Turns. */
+          if (request.filters !== null && request.filters !== undefined) setFilters(request.filters)
         }
         apply(takePanelSearch(sessionId))
         return onPanelSearchRequest((target) => {
@@ -2086,7 +2397,7 @@ window.__ModuleLoader__.load({
 
       const onPick = useCallback(
         (item, words) => {
-          if (!jumpToNode(item.key, words)) {
+          if (!jumpToNode(item.key, words, item.anchor)) {
             setError(t('jump.missing'))
             return
           }
@@ -2559,11 +2870,12 @@ window.__ModuleLoader__.load({
               turn: question.number,
               query: jumpQuery,
               scope,
+              filters,
             },
             titleOf(session),
           )
         },
-        [openTarget, resultWords, titleOf, jumpQuery, scope],
+        [openTarget, resultWords, titleOf, jumpQuery, scope, filters],
       )
       const openParagraph = useCallback(
         (session, question, paragraph) => {
@@ -2575,14 +2887,16 @@ window.__ModuleLoader__.load({
               kind: 'paragraph',
               words: resultWords,
               anchor: paragraph.anchor,
+              paragraph: paragraph.anchor,
               turn: paragraph.turn,
               query: jumpQuery,
               scope,
+              filters,
             },
             titleOf(session),
           )
         },
-        [openTarget, resultWords, titleOf, jumpQuery, scope],
+        [openTarget, resultWords, titleOf, jumpQuery, scope, filters],
       )
 
       const paragraphRow = (session, question, paragraph) => {
@@ -2988,6 +3302,29 @@ window.__ModuleLoader__.load({
       return null
     }
 
+    /**
+     * Opens the search panel once the Session a jump asked for is actually open.
+     *
+     * `openSearchTab` is called right after `openSession`, but a cross-Session switch can remount
+     * the sidebar after that call and drop the tab; this seat re-issues the request at the moment
+     * the target Session reports `open`.
+     */
+    function PanelOpener(props) {
+      const sessionId = props.sessionId
+      const useSession = props.useSession
+      const openPanel = props.openPanel
+      const openState = useSession((snapshot) => snapshot.openState)
+
+      useEffect(() => {
+        if (openState !== 'open') return
+        const until = panelOpenWanted(sessionId)
+        if (until === 0) return
+        openPanel(until)
+      }, [sessionId, openState, openPanel])
+
+      return null
+    }
+
     /** Drives one pending cross-Session jump once its Session finishes loading. */
     function JumpRunner(props) {
       const sessionId = props.sessionId
@@ -3030,7 +3367,7 @@ window.__ModuleLoader__.load({
           /* The nearest-node fallback is only safe once nothing older can still arrive. */
           const allowNearest = hasMoreRef.current === false || pending.tries > 20
           const target = resolveJump(orderRef.current, nodesRef.current, pending, allowNearest)
-          if (target !== null && jumpToNode(target.key, pending.words)) {
+          if (target !== null && jumpToNode(target.key, pending.words, pending.paragraph)) {
             finish()
             return
           }
@@ -3052,6 +3389,12 @@ window.__ModuleLoader__.load({
 
     /** Package-owned stylesheet, removed with the plugin run. */
     function insertStyles() {
+      /* A hot reload replaces this module but not the DOM: drop a box layer a previous run left. */
+      try {
+        for (const stale of document.querySelectorAll('.dsh-csearch-highlight-layer')) stale.remove()
+      } catch (error) {
+        /* No document to sweep. */
+      }
       const tag = document.createElement('style')
       tag.dataset.dshPlugin = TAB_ID
       tag.textContent = CSS + '\n' + CSS_RESULTS
@@ -3153,6 +3496,23 @@ window.__ModuleLoader__.load({
             ),
           ),
         'conversation-search: opening watcher',
+      )
+
+      /* Re-issues a jump-requested panel open once the target Session is actually open. */
+      ctx.effect(
+        () =>
+          ctx.slots.inject('conversation.session.header.utilities', () =>
+            ctx.slots.register(
+              {
+                name: 'conversation.session.header.utilities',
+                id: TAB_ID + ':panel',
+                order: 902,
+                inject: (sessionId) => ({ openPanel: (until) => openSearchTab(ctx, sessionId, { focus: false, until }) }),
+              },
+              PanelOpener,
+            ),
+          ),
+        'conversation-search: panel opener',
       )
 
       /* Wait for the tab registry itself: the right sidebar declares its slot before it provides

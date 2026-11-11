@@ -61,6 +61,31 @@ function makeSession(id, title, cwd, turns) {
   return { id, header: { id, createdAt: 1000, cwd }, events }
 }
 
+/**
+ * One Session log written by a release that records Turn boundaries: `turn/start` carries the
+ * Turn number the conversation UI shows, and each reply repeats it.
+ */
+function makeTurnSession(id, title, turns) {
+  const events = []
+  let seq = 0
+  let clock = NOW - MINUTE
+  const push = (type, data, at) => {
+    events.push({ type, seq: seq++, time: typeof at === 'number' ? at : clock, data })
+  }
+  for (const turn of turns) {
+    push('turn/start', { turn: turn.number }, turn.at)
+    for (const user of turn.users || []) {
+      push('user/message', { content: [{ type: 'text', text: user }], source: { kind: 'user', rpcId: 'rpc-' + seq } }, turn.at)
+    }
+    for (const reply of turn.replies || []) {
+      push('assistant/message', { turn: turn.number, step: 1, message: { content: [{ type: 'text', text: reply }] } }, turn.at)
+    }
+    push('turn/end', { turn: turn.number }, turn.at)
+  }
+  if (title !== null) push('session/title', { title }, NOW)
+  return { id, header: { id, createdAt: 1000, cwd: 'C:/work/turns' }, events }
+}
+
 const logs = [
   makeSession('s1', '侧边栏宽度调整', 'C:/work/demo', [
     {
@@ -90,6 +115,23 @@ const logs = [
   makeSession('s4', '筛选验证', 'C:/work/filter', [
     { at: NOW - 40 * DAY, user: '远古记录的锚点词语', replies: [{ text: '这条回复里有远古记录的锚点词语。' }] },
     { at: NOW - 2 * DAY, user: '近期记录的独特标记', replies: [{ text: '这条回复里有近期记录的独特标记。' }] },
+  ]),
+  /* Turn-aware log: two questions in Turn 2, and a Turn without any user message. */
+  makeTurnSession('s5', '轮次一致验证', [
+    {
+      number: 1,
+      users: ['第一问的锚点'],
+      replies: ['甲段内容在这里。\n\n乙段内容在这里。'],
+    },
+    {
+      number: 2,
+      users: ['第二问的锚点', '补充提问的锚点'],
+      replies: ['丙段内容在这里。'],
+    },
+    {
+      number: 3,
+      replies: ['无提问轮的段落锚点。'],
+    },
   ]),
 ]
 
@@ -261,6 +303,43 @@ check(
 
 const refreshed = await post({ action: 'search', query: '侧边栏', scope: 'all', refresh: true })
 check('refresh rebuilds and answers', refreshed.status === 200 && refreshed.body.ok === true)
+
+// #endregion
+
+// #region turn numbering ------------------------------------------------------
+
+const turnOne = await post({ action: 'search', query: '乙段', scope: 'paragraph' })
+const turnOneSession = turnOne.body.value.sessions[0]
+check(
+  'turns: only the turn-aware Session matched',
+  turnOne.body.value.sessions.length === 1 && turnOneSession.id === 's5',
+  JSON.stringify(turnOne.body.value.sessions.map((s) => s.id)),
+)
+check('turns: the paragraph carries DSH Turn 1', turnOneSession.questions[0].number === 1, JSON.stringify(turnOneSession.questions[0].number))
+check(
+  'turns: paragraphs continue across one reply message',
+  turnOneSession.questions[0].paragraphs[0].index === 2,
+  JSON.stringify(turnOneSession.questions[0].paragraphs[0].index),
+)
+
+const steering = await post({ action: 'search', query: '补充提问的锚点', scope: 'question' })
+const steeringSession = steering.body.value.sessions[0]
+check('turns: a second user message does not add a question row', steeringSession.questionTotal === 3, String(steeringSession.questionTotal))
+check('turns: that message keeps Turn 2', steeringSession.questions[0].number === 2, String(steeringSession.questions[0].number))
+check(
+  'turns: the jump anchor is the message that matched',
+  String(steeringSession.questions[0].anchor).includes('补充提问'),
+  String(steeringSession.questions[0].anchor),
+)
+
+const emptyTurn = await post({ action: 'search', query: '无提问轮的段落锚点', scope: 'paragraph' })
+const emptyQuestion = emptyTurn.body.value.sessions[0].questions[0]
+check(
+  'turns: a Turn without a user message stays searchable',
+  emptyQuestion.number === 3 && emptyQuestion.paragraphs.length === 1,
+  JSON.stringify([emptyQuestion.number, emptyQuestion.paragraphs.length]),
+)
+check('turns: it has no question text or question hit', emptyQuestion.matched === false && emptyQuestion.text === '')
 
 // #endregion
 

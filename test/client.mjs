@@ -170,6 +170,8 @@ add(
     { kind: 'tool-call', name: 'write', callId: 'c1', argsRaw: '{"file_path":"src/sb.css"}' },
   ]),
 )
+/* A second reply message inside Turn 1: paragraph numbers must continue, not restart. */
+add(assistantNode('n2b', 1, [{ kind: 'text', text: '补记一句话：那次改动之后没有回退。' }]))
 add(userNode('n3', 2, '再来一次侧边栏宽度的调整，这次要记住上次的值。'))
 add(
   assistantNode('n4', 2, [
@@ -507,6 +509,15 @@ if (!/\.dsh-cg-page mark\{[^}]*rgba\(255,\s*199,\s*0/.test(code)) {
   console.error('FAIL: page keyword marks are not amber')
   process.exit(1)
 }
+/* The landed paragraph is blue, so it never reads as a keyword hit. */
+if (!/::highlight\(dsh-chat-search-selected\)\{[^}]*rgba\(74,\s*144,\s*255/.test(code)) {
+  console.error('FAIL: the paragraph selection is not blue')
+  process.exit(1)
+}
+if (!/\[data-dsh-csearch-selected\]/.test(code)) {
+  console.error('FAIL: the no-Highlight-API selection fallback is missing')
+  process.exit(1)
+}
 
 plugin.apply(ctx)
 
@@ -549,6 +560,19 @@ check('reports paragraph position', panelText.includes('第 1 段'))
 check('assistant role label', panelText.includes('回复'))
 check('user role label', panelText.includes('提问'))
 check('unrelated paragraph excluded', !panelText.includes('这一段落与搜索词无关'))
+
+/* The second reply message of Turn 1: paragraph numbers continue across messages. */
+let offsetTree = await settle('panel-offset', bodyRegistration.Component, panelProps)
+const offsetInput = findNode(offsetTree, 'dsh-csearch-input')
+if (offsetInput !== null) offsetInput.props.onChange({ target: { value: '补记一句话' } })
+offsetTree = await settle('panel-offset', bodyRegistration.Component, panelProps)
+const offsetText = flatten(offsetTree).join('|')
+check('a second reply message keeps its Turn', offsetText.includes('第 1 轮'), offsetText.slice(0, 200))
+check(
+  'paragraph numbers continue across reply messages',
+  offsetText.includes('第 5 段'),
+  offsetText.slice(0, 300),
+)
 
 // #endregion
 
@@ -622,6 +646,16 @@ check(
 check(
   'jump carries the text anchor and turn',
   opened.length === 1 && opened[0].jump.anchor === '我已经调整了侧边栏宽度。' && opened[0].jump.turn === 1,
+  JSON.stringify(opened[0] && opened[0].jump),
+)
+check(
+  'jump carries the paragraph anchor for the selection marker',
+  opened.length === 1 && opened[0].jump.paragraph === '我已经调整了侧边栏宽度。',
+  JSON.stringify(opened[0] && opened[0].jump),
+)
+check(
+  'jump mirrors the page filter window into the panel',
+  opened.length === 1 && opened[0].jump.filters !== undefined && opened[0].jump.filters.turns === 30,
   JSON.stringify(opened[0] && opened[0].jump),
 )
 
@@ -822,6 +856,44 @@ check(
   questionOnlyPlain.includes('帮我把右侧边栏的宽度调整一下'),
   questionOnlyText.slice(0, 300),
 )
+
+// #endregion
+
+// #region panel opener ---------------------------------------------------------
+
+const openerEntry = byName('conversation.session.header.utilities').find((entry) => String(entry.options.id).endsWith(':panel'))
+check('panel opener registered', openerEntry !== undefined)
+if (openerEntry !== undefined) {
+  openedTabs.length = 0
+  page.options.inject().openTarget(
+    's9',
+    {
+      seq: 9,
+      kind: 'paragraph',
+      words: ['锚点'],
+      anchor: '锚点段落',
+      paragraph: '锚点段落',
+      turn: 3,
+      query: '锚点',
+      scope: 'all',
+      filters: { since: '', until: '', turns: 3 },
+    },
+    '测试会话',
+  )
+  check('a jump opens the tab immediately', openedTabs.includes('conversation-search'), JSON.stringify(openedTabs))
+
+  openedTabs.length = 0
+  renderComponent('panel-opener', openerEntry.Component, {
+    ...openerEntry.options.inject('s9'),
+    sessionId: 's9',
+    useSession: (selector) => selector({ openState: 'open' }),
+  })
+  check(
+    'the opener re-issues the tab once the Session reports open',
+    openedTabs.includes('conversation-search'),
+    JSON.stringify(openedTabs),
+  )
+}
 
 // #endregion
 
