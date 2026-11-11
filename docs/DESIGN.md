@@ -48,18 +48,24 @@ entry = {
   title,          // 真实标题（session/title 事件）
   displayTitle,   // 无标题时用首条提问前 40 字
   signature,      // live:事件数 / stored
-  questions: [{
-    seq, text, files: string[],      // files = 用户附件名
+  questions: [{                    // 一轮（DSH Turn）一条
+    turn,                          // turn/start 的 data.turn
+    seq, time,                     // 跳转与时间窗用的消息/轮次信息
+    parts: [{                      // 同一 Turn 的多条 user/message（steering）
+      seq, text, files: string[],  // files = 用户附件名
+    }],
     paragraphs: [{
       seq, kind: 'text' | 'file',
-      text,                          // 文本段落；file 行为 ''
-      files: string[],               // 工具调用路径 / patch 路径
+      text,                        // 文本段落；file 行为 ''
+      files: string[],             // 工具调用路径 / patch 路径
     }]
   }]
 }
 ```
 
-- **问题**由 `user/message`（`source.kind` 为 `user` / `steering`）开启；其后的 `assistant/message` 依次贡献段落。
+- **轮次**：Host 用 `turn/start` 的 `data.turn` 建 question。Chat 节点的 `location.turn.turn` 与它同源，所以全局页与会话内面板的「第 N 轮」必然一致；没有 `turn/start` 的旧日志按用户消息序号编号。
+- **问题**：同一 Turn 的多条 `user/message`（`source.kind` 为 `user` / `steering`）合并进 `parts`；任一 part 命中即算问题命中，跳转用**命中的那个 part** 的 `seq`/`anchor`。没有用户消息的 Turn 也建 question（text 为空），其回复段落依旧可检索。
+- **段落**：一个 Turn 内所有 `assistant/message` 的段落按顺序**连续编号**（文件行也占号），与会话内面板的累计规则一致；这就是两处「第 M 段」不再打架的原因。
 - **文件行**：有工具调用路径、且正文未包含该文件名时，单独成行，保证可检索、可跳转、可解释。
 - 文件来源：用户附件（`block.attachment`）、工具参数（`path/file_path/target/filename`）、`apply_patch` 的 `*** Update File:` 头。
 
@@ -103,6 +109,9 @@ entry = {
   stats: { sessions, questions, paragraphs, indexed, truncated, tookMs } }
 ```
 
+语义：`questions[].number` 与 `paragraphs[].turn` 都是 **DSH 的 Turn 号**（`turn/start` 的 `data.turn`）；
+`paragraphs[].index` 是**该 Turn 内**的段落序号（跨回复消息连续）。会话内面板用同一规则计算，所以两处显示一致。
+
 约束：单次最多 30 会话 / 12 问题 / 8 段落；语料最多 400 会话、800 万字符；body ≤ 128 KiB。
 
 鉴权：`ctx.connection.requestRejection`（浏览器凭据）；无凭据返回 401。
@@ -111,7 +120,7 @@ entry = {
 
 `openTarget(sessionId, jump, title)`：
 
-1. 记录 `pendingJumps[sessionId] = { seq, kind, words, anchor, turn }`；
+1. 记录 `pendingJumps[sessionId] = { seq, kind, words, anchor, paragraph, turn }`（`paragraph` 是段落锚点，用于落地后的选中）；
 2. `beginOpening()` 开启过场（160ms 后才显示蒙版，避免闪烁）；
 3. `uiWorkspace.openSession(sessionId)`——它同时把主面板切回对话。
 
@@ -123,21 +132,27 @@ entry = {
 4. 仅当历史已加载完（`hasMore === false`）或重试 > 20 次，才允许「最近节点」兜底；
 5. 都不中 → 不落点，`loadThrough(seq)` 补历史后继续等。
 
-落地后 `replayLanding` 在 120/400/900/1500ms 重放「滚动 + 高亮 + 描边」，抵消平滑滚动导致的坐标漂移与 ChatView 重渲染带来的节点替换。**会话内面板与全局跳转共用同一入口**（`jumpToNode` 内部即重放），避免只画一次时标记留在旧坐标。
+落地后 `replayLanding` 在 120/400/900/1500ms 重放「滚动 + 关键词高亮 + 段落选中」，抵消平滑滚动导致的坐标漂移与 ChatView 重渲染带来的节点替换。**会话内面板与全局跳转共用同一入口**（`jumpToNode` 内部即重放），避免只画一次时标记留在旧坐标。
 
 > 早期版本在找不到精确 seq 时直接取「最近的已加载节点」，目标未加载时会先跳到上一条消息并结束跳转——这是「落点不准」的根因，v6 已修正。
 
 ### 6.1 全局 → 会话内的检索联动
 
-从全局页点开一条结果时，跳转载荷额外带上 `query` 与 `scope`。`openTarget` 在打开会话后：
+从全局页点开一条结果时，跳转载荷额外带上 `query`、`scope`、`filters` 与段落锚点。`openTarget` 在打开会话后：
 
-1. 把 `{query, scope}` 放进模块级队列（按会话去重）；
+1. 把 `{query, scope, filters}` 放进模块级队列（按会话去重）；
 2. 打开右侧检索面板（不抢焦点）；
-3. 面板挂载时取走请求，或已挂载时由监听器立即应用——设置关键词与范围，之后的跳转/高亮与面板内点击完全一致。
+3. 面板挂载时取走请求，或已挂载时由监听器立即应用——设置关键词、范围与**同一筛选窗口**，之后的跳转/高亮/段落编号与面板内点击完全一致。
 
 范围映射：`question → 仅问题`、`paragraph → 仅段落`，其余（`all` / `session` / `session-question`）→ `全部`；会话标题只在全局页索引，面板没有对应档位。
 
-性能取舍：镜像触发的检索**不自动翻页**（跳转已经 `loadThrough` 到目标），只搜已加载窗口并沿用「更早的历史尚未加载」提示；面板检索是对已加载节点的内存扫描，增量成本可忽略。
+性能取舍：镜像触发的检索**不自动翻页**（跳转已经 `loadThrough` 到目标），只搜已加载窗口并沿用「更早的历史尚未加载」提示；面板检索是对已加载节点的内存扫描，增量成本可忽略。镜像跳转已把目标所在 Turn 之前的消息加载进来，因此面板按 Turn 累计出的段落号与全局页一致。
+
+### 6.2 面板打开的可靠性
+
+- `openTarget` 打开会话后立即请求一次面板（同会话快路径），同时把请求记成 pending，截止 10 秒。
+- `PanelOpener`（会话标题栏里的无渲染 seat）监听 `openState`：目标会话变为 `open` 时若 pending 还在就再开一次——**跨会话切换会重挂右栏，早开的那次会被重置**，这是「偶尔没打开」的根因。
+- 面板真正挂载时 `markPanelOpen` 清 pending；10 秒内仍挂不上只记 `console.warn`，不阻塞跳转本身。
 
 ## 7. 高亮实现
 
@@ -145,13 +160,20 @@ entry = {
 
 - `wordRanges(row, words)` 在行内遍历文本节点，生成命中 `Range`；
 - 有 Custom Highlight API 时：`CSS.highlights.set('dsh-chat-search', new Highlight(...ranges))`，配合
-  `::highlight(dsh-chat-search){background-color:rgba(74,144,255,.32);color:inherit}`。
+  `::highlight(dsh-chat-search){background-color:rgba(255,199,0,.5);color:inherit}`。
   高亮锚在文本上，**滚动时天然跟随**，观感与浏览器查找一致（纯底色、无边框），也不改动 Chat DOM；
+- **段落选中**：跳转落地后，把目标段落用一个"空白折叠 + 下标映射"的文本扫描定位成 `Range`，注册第二个 highlight
+  `dsh-chat-search-selected`（`rgba(74,144,255,.18)`，蓝）；先注册选中、后注册关键词，琥珀压在蓝色之上，两者不撞色。
+  蓝底覆盖整段、随文本滚动，比给整行描边更容易看出"落在哪一段"；
 - 没有该 API 时：在 `document.body` 下画 `position: fixed` 的半透明方框（同样无边框），并监听聊天滚动容器与窗口 resize，
-  用 `requestAnimationFrame` 重新定位（`transform` 平移），保证跟随滚动；
-- **常驻策略**：高亮不自动消失，直到下一次检索（查询词变化）或关闭会话内检索面板；全局检索跳转后离开页面不清除；
+  用 `requestAnimationFrame` 重新定位（`transform` 平移），保证跟随滚动；段落选中退化为给目标块元素加
+  `data-dsh-csearch-selected` 描边；
+- **边界裁剪**：`position: fixed` 的框不会跟随滚动容器裁剪，内容滚到输入框下方时框会留在原地。兜底层因此按
+  `[data-conversation-scroll]` 的矩形与 `[data-composer-seat]` 的顶边裁剪：完全越界就隐藏，部分可见就裁 top/height；
+  滚动/尺寸变化用 ResizeObserver 重算；插件重新加载时清理历史遗留的覆盖层；
+- **常驻策略**：高亮与段落选中不自动消失，直到下一次检索（查询词变化）或关闭会话内检索面板；全局检索跳转后离开页面不清除；
 - 落地后 120/400/900/1500ms 重放（重渲染会换掉文本节点，Range 需要重建）；
-- 不再给整行加描边环：落地反馈只靠滚动 + 文字底色，避免"框住整条消息"的观感。
+- 不再给整行加描边环：落地反馈只靠滚动 + 文字底色 + 段落蓝底，避免"框住整条消息"的观感。
 
 > 早期版本的 `::highlight` 规则里用了 `color-mix()`；在不支持的构建上该声明会被丢弃，
 > 高亮因此“存在但透明”，看起来像完全没有高亮。现在颜色一律先用 `rgba()`，`color-mix()` 只作为增强。

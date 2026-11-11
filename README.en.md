@@ -11,7 +11,7 @@ match **paragraphs** and **file names**, expand as a **session → question → 
 can be narrowed by **date range** and **turn count**, and a click jumps to the exact paragraph
 with the matched words highlighted.
 
-> Status: 1.1.1, targets DSH ≥ 0.2.0-rc.1. Best effort — the plugin leans on a few undocumented
+> Status: 1.2.0, targets DSH ≥ 0.2.0-rc.1. Best effort — the plugin leans on a few undocumented
 > DOM anchors and client services, so a future DSH release may break it; fixes follow quickly.
 
 ## Screenshots
@@ -37,8 +37,12 @@ paragraphs, file names and hit counts.
   or "the last 30 turns" is a filter instead of something you eyeball afterwards.
 - **Readable at a glance** — global search takes over the main area as a full result tree, not a
   panel squeezed into a corner.
+- **One numbering on both sides** — turns use the DSH Turn number and paragraph numbers run
+  across every reply message of a Turn, so the global page and the panel show the same
+  "Turn N / Paragraph M".
 - **Visible landing** — a click opens the session, pages in missing history, resolves the turn,
-  then highlights the matched words with the browser's own find styling that follows scrolling.
+  then highlights the matched words with the browser's own find styling that follows scrolling;
+  the landed paragraph also gets a **blue selection wash**, distinct from the amber keywords.
 - **One keystroke** — `Ctrl/Cmd+F` opens the panel; Enter jumps to the first hit.
 
 ## Install

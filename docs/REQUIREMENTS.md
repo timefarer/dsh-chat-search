@@ -31,8 +31,8 @@
 | R23 | 筛选 | 全局检索对所有会话生效，会话内检索仅对当前会话生效 | ✅ | Host `searchCorpus` 逐会话裁剪；Client `searchConversation` 只看当前会话 |
 | R24 | 筛选 | 记住筛选范围配置 | ✅ | `plugin-data/conversation-search/filters.json`，两处控件共用 |
 | R25 | 筛选 | 未说明但必要的设计 | ✅ | 范围摘要、一键重置、修改即重跑、空结果提示、轮次序号保持真实值 |
-| R26 | 发布 | 作为独立开源项目发布（GitHub + npm） | ✅ | `dsh-chat-search@1.0.1` 已发布，`dsh plugin add dsh-chat-search` 可用 |
-| R27 | 发布 | 被 dsh-market 检索到 | 🟡 | 收录目录 PR [#13785](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/13785) 已提交，等评审合并；合并后站点与市场自动收录 |
+| R26 | 发布 | 作为独立开源项目发布（GitHub + npm） | ✅ | `dsh-chat-search@1.1.1` 已发布，`dsh plugin add dsh-chat-search` 可用 |
+| R27 | 发布 | 被 dsh-market 检索到 | 🟡 | 目录 PR [#13785](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/13785) 于 2026-11-11 10:56 合并、改名跟进 [#14210](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14210) 于 15:29 合并；`timefarer__dsh-chat-search.yml` 已入 main，中英文 README 与站点详情页已生成；**站点与应用内索引尚未重建，暂不可搜索** |
 | R28 | 发布 | 安装说明要通用，不绑定本机 | ✅ | 应用内「插件 → 添加插件」优先；命令行 `dsh plugin add dsh-chat-search`，指定 profile 时再加 `--profile` |
 | R29 | 发布 | 代码与对话工作区分离 | ✅ | 仓库迁到 `deepseek-harness/projects/dsh-chat-search`，profile 从新路径 link 安装 |
 | R30 | 联动 | 从全局跳转后在会话内面板按同一关键词与范围重跑检索，并定位到同一段 | ✅ | 跳转载荷携带 `query`/`scope`；`openTarget` 自动开面板并把请求交给它 |
@@ -42,6 +42,10 @@
 | R34 | 交互 | 结果行要区分「展开」与「跳转」，无需读文档 | ✅ | 会话/问题行只有 ▾（展开），段落行悬停出现 ↗（跳转）；无段落的问题行给独立「↗ 跳转」按钮；顶部一行图例 |
 | R35 | 交互 | 跳转提示要稳定出现，文案说明是「跳转」的等待 | ✅ | 改为顶部胶囊，点击即出现；文案「正在跳到第 N 轮…」+ 会话标题；不拦截点击 |
 | R36 | 交互 | 其他等待场景都要有加载动画 | ✅ | 全局检索中 / 重建索引中 / 会话内补历史均显示转圈 + 对应文案 |
+| R37 | 编号 | 全局与会话内的「第 N 轮」「第 M 段」必须一致 | ✅ | Host 用 `turn/start` 的 Turn 号建 question；面板按 Turn 累计段落；同轮多条用户消息合并；镜像检索带同一筛选窗口 |
+| R38 | 稳定性 | 高亮不得越出对话滚动区（尤其是输入框上方） | ✅ | 兜底覆盖层按 `[data-conversation-scroll]` 与 `[data-composer-seat]` 裁剪；越界隐藏、部分可见裁切 |
+| R39 | 稳定性 | 从全局跳转必须打开会话搜索面板 | ✅ | `PanelOpener` 在会话 open 后补开 + 最长 10s 重试；面板挂载即确认 |
+| R40 | 交互 | 跳转后目标段落要能被识别，且不与关键词高亮撞色 | ✅ | 蓝色 `::highlight(dsh-chat-search-selected)` 覆盖整段，琥珀关键词压在其上；无 API 时块级描边；全局跳转同样生效 |
 
 ## 需求变更记录
 
