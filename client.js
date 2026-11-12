@@ -42,33 +42,26 @@ window.__ModuleLoader__.load({
     function installProbe() {
       if (typeof window === 'undefined') return
       window.__dshChatSearchProbe = () => {
-        const marked = typeof document !== 'undefined' ? document.querySelector('[data-dsh-csearch-selected]') : null
         let pickedRuleLoaded = false
-        let selectionRuleLoaded = false
         try {
           const sheets = document.styleSheets || []
           for (let index = 0; index < sheets.length; index += 1) {
             const rules = sheets[index].cssRules || []
             for (let rule = 0; rule < rules.length; rule += 1) {
-              const selector = String(rules[rule].selectorText || '')
-              if (selector.indexOf('--picked') >= 0) pickedRuleLoaded = true
-              if (selector.indexOf('data-dsh-csearch-selected') >= 0) selectionRuleLoaded = true
+              if (String(rules[rule].selectorText || '').indexOf('--picked') >= 0) pickedRuleLoaded = true
             }
           }
         } catch (error) {
-          /* A cross-origin sheet cannot be read; the two flags stay false and say so. */
+          /* A cross-origin sheet cannot be read; the flag stays false and says so. */
         }
         return {
           build: BUILD,
           pickedRuleLoaded,
-          selectionRuleLoaded,
-          selected: marked === null ? null : {
-            tag: marked.tagName,
-            className: String(marked.className || '').slice(0, 80),
-            textLength: String(marked.textContent || '').length,
-            text: String(marked.textContent || '').slice(0, 80),
-            background: getComputedStyle(marked).backgroundColor,
-            shadow: getComputedStyle(marked).boxShadow,
+          rail: railElement === null ? null : {
+            display: getComputedStyle(railElement).display,
+            top: getComputedStyle(railElement).top,
+            height: getComputedStyle(railElement).height,
+            visibility: getComputedStyle(railElement).visibility,
           },
         }
       }
@@ -323,9 +316,6 @@ window.__ModuleLoader__.load({
       '.dsh-csearch-group-head{display:flex;align-items:baseline;gap:6px;padding:6px 8px;position:sticky;top:0;z-index:1;background:var(--dsw-specific-sidebar-fill,var(--dsw-alias-bg-base))}',
       '.dsh-csearch-turn{flex:none;color:var(--dsw-alias-brand-primary);font-size:11px;font-weight:600;letter-spacing:.02em}',
       '.dsh-csearch-question{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dsw-alias-label-secondary);font-size:12px}',
-      '.dsh-csearch-item{display:flex;flex-direction:column;gap:3px;width:100%;margin:0;padding:7px 8px;border:0;border-radius:var(--dsw-radius-sm,8px);background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}',
-      '.dsh-csearch-item:hover{background:var(--dsw-alias-bg-layer-2)}',
-      '.dsh-csearch-item:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-2px}',
       '.dsh-csearch-meta{display:flex;align-items:center;gap:6px;color:var(--dsw-alias-label-secondary);font-size:11px}',
       '.dsh-csearch-meta span+span::before{content:"·";margin-right:6px;opacity:.7}',
       '.dsh-csearch-snippet{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;line-height:1.55}',
@@ -473,7 +463,6 @@ window.__ModuleLoader__.load({
       '.dsh-csearch-files{display:flex;flex-wrap:wrap;gap:4px}',
       '.dsh-csearch-file{max-width:100%;padding:1px 7px;border:.5px solid var(--dsw-alias-border-l1);border-radius:999px;color:var(--dsw-alias-label-secondary);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
       '::highlight(dsh-chat-search){background-color:rgba(255,199,0,.5);color:inherit}',
-      '[data-dsh-csearch-selected]{background:rgba(74,144,255,.14);border-radius:6px;box-shadow:inset 0 0 0 2px rgba(74,144,255,.55)}',
       '.dsh-csearch-rail{position:fixed;width:3px;border-radius:2px;background:rgba(74,144,255,.7);box-shadow:0 0 6px rgba(74,144,255,.45);pointer-events:none;z-index:60;transition:top .08s linear,height .08s linear}',
       '.dsh-csearch-highlight-layer{position:fixed;inset:0;z-index:900;pointer-events:none;overflow:hidden}',
       '.dsh-csearch-highlight{position:absolute;border-radius:2px;background:rgba(255,199,0,.5)}',
@@ -493,7 +482,6 @@ window.__ModuleLoader__.load({
       '.dsh-csearch-item--picked:hover{background:rgba(74,144,255,.2);border-color:var(--dsw-alias-brand-primary)}',
       '.dsh-csearch-go{margin-left:auto;opacity:0;color:var(--dsw-alias-brand-primary);font-size:11px;transition:opacity .12s}',
       '.dsh-csearch-item:hover .dsh-csearch-go,.dsh-csearch-item:focus-visible .dsh-csearch-go{opacity:1}',
-      '.dsh-csearch-item:hover{border-color:var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2)}',
       '.dsh-csearch-item:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-2px}',
       '.dsh-csearch-meta{display:flex;align-items:center;gap:6px;color:var(--dsw-alias-label-secondary);font-size:11px}',
       '.dsh-csearch-hits{padding:0 6px;border-radius:999px;background:color-mix(in srgb,var(--dsw-alias-brand-primary) 12%,transparent);color:var(--dsw-alias-brand-primary)}',
@@ -1245,23 +1233,25 @@ window.__ModuleLoader__.load({
     let highlightScroller = null
     /** Watches the scrollport and the composer seat so a resize repaints instead of drifting. */
     let highlightObserver = null
-    /** The paragraph the jump landed on, marked apart from the keyword highlight. */
+    /** Where the last jump landed: the message row plus the paragraph range inside it. */
     let selectedRange = null
-    let selectedBlock = null
     let selectedAnchor = ''
     let selectedRow = null
-    /** Left-edge rail that always shows where the landed paragraph sits in the conversation. */
+    /** Left-edge rail that shows where the landed paragraph sits in the conversation. */
     let railElement = null
-    let railTarget = null
 
     /** Draw (or move) the left rail next to the landed paragraph. */
-    function paintRail(target) {
+    function paintRail(row, range) {
       if (typeof document === 'undefined' || !document.body) return
+      selectedRow = row
+      selectedRange = range
       if (railElement === null) {
         try {
           railElement = document.createElement('div')
           railElement.className = 'dsh-csearch-rail'
           railElement.setAttribute('aria-hidden', 'true')
+          /* Positioned before it is shown, so it never appears in the wrong place first. */
+          railElement.style.visibility = 'hidden'
           document.body.appendChild(railElement)
           document.addEventListener('scroll', onRailScroll, { capture: true, passive: true })
           window.addEventListener('resize', onRailScroll)
@@ -1270,20 +1260,33 @@ window.__ModuleLoader__.load({
           return
         }
       }
-      railTarget = target
       onRailScroll()
     }
 
-    function onRailScroll() {
-      if (railElement === null || railTarget === null) return
-      let rect
-      try {
-        rect = railTarget.getBoundingClientRect()
-      } catch (error) {
-        railElement.style.display = 'none'
-        return
+    /** The rectangle the rail should follow: the paragraph when known, its message otherwise. */
+    function railRect() {
+      if (selectedRange !== null) {
+        try {
+          const rect = selectedRange.getBoundingClientRect()
+          if (rect !== null && rect.height >= 1) return rect
+        } catch (error) {
+          /* A re-render replaced the text nodes; fall back to the message row. */
+        }
       }
-      if (rect === null || rect.height < 1) {
+      if (selectedRow === null) return null
+      try {
+        const rect = selectedRow.getBoundingClientRect()
+        if (rect !== null && rect.height >= 1) return rect
+      } catch (error) {
+        return null
+      }
+      return null
+    }
+
+    function onRailScroll() {
+      if (railElement === null) return
+      const rect = railRect()
+      if (rect === null) {
         railElement.style.display = 'none'
         return
       }
@@ -1305,10 +1308,11 @@ window.__ModuleLoader__.load({
       railElement.style.left = left + 'px'
       railElement.style.top = Math.max(0, top) + 'px'
       railElement.style.height = Math.min(height, window.innerHeight - Math.max(0, top)) + 'px'
+      railElement.style.visibility = 'visible'
     }
 
     function clearRail() {
-      railTarget = null
+      selectedRange = null
       if (railElement !== null) {
         try {
           railElement.remove()
@@ -1503,19 +1507,6 @@ window.__ModuleLoader__.load({
       positionOverlay()
     }
 
-    /** Native selection highlight: a blue wash over the whole paragraph, under the amber words. */
-    function applyNativeSelection(range) {
-      if (range === null) return false
-      if (typeof Highlight === 'undefined') return false
-      if (typeof CSS === 'undefined' || !CSS || !CSS.highlights || typeof CSS.highlights.set !== 'function') return false
-      try {
-        CSS.highlights.set(SELECTED, new Highlight(range))
-        return true
-      } catch (error) {
-        return false
-      }
-    }
-
     function clearNativeSelection() {
       try {
         if (typeof CSS !== 'undefined' && CSS && CSS.highlights && typeof CSS.highlights.delete === 'function') {
@@ -1592,111 +1583,32 @@ window.__ModuleLoader__.load({
     }
 
     /** Debug dump of one message's element tree, so a failed anchor match can be diagnosed. */
-    function dumpRowStructure(row) {
-      if (!debugEnabled()) return
-      const describe = (element) => ({
-        tag: element.tagName,
-        cls: String(element.className || '').slice(0, 40),
-        len: String(element.textContent || '').length,
-        head: String(element.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 40),
-      })
-      const children = []
-      try {
-        const all = row.querySelectorAll('*')
-        for (let index = 0; index < all.length && children.length < 14; index += 1) {
-          const element = all[index]
-          if (String(element.textContent || '') === '') continue
-          children.push(describe(element))
-        }
-      } catch (error) {
-        /* Nothing to dump without a DOM. */
-      }
-      debugLog('selection: row structure', { row: describe(row), children })
-    }
-
-    /** Fallback for a build without the Custom Highlight API: outline the paragraph's block. */
-    function markParagraphBlock(row, anchor) {
-      const needle = normalizeAnchor(anchor)
-      if (needle === '' || typeof row.querySelectorAll !== 'function') return false
-      let match = null
-      let matchLength = Number.POSITIVE_INFINITY
-      /* Any element, not a fixed tag list: the chat renderer is free to use divs or spans, and a
-         tag whitelist is exactly why the marker sometimes never appeared. The smallest element
-         whose text contains the anchor is the paragraph, whatever it is made of. */
-      for (const element of row.querySelectorAll('*')) {
-        const raw = typeof element.textContent === 'string' ? element.textContent : ''
-        if (raw === '') continue
-        const text = stripInlineMarkdown(raw).toLowerCase().replace(/\s+/g, ' ').trim()
-        if (text.indexOf(needle) < 0) continue
-        if (text.length < matchLength) {
-          match = element
-          matchLength = text.length
-        }
-      }
-      if (match === null || typeof match.setAttribute !== 'function') {
-        debugLog('selection: no element carried the anchor', { anchor: needle.slice(0, 60) })
-        dumpRowStructure(row)
-        return false
-      }
-      debugLog('selection: marked', { tag: match.tagName, className: String(match.className || '').slice(0, 60), length: matchLength })
-      try {
-        match.setAttribute('data-dsh-csearch-selected', 'true')
-        selectedBlock = match
-        return true
-      } catch (error) {
-        return false
-      }
-    }
-
-    /** Drop the paragraph selection (native wash, fallback outline and the remembered range). */
+    /** Drop the arrival marker and the rail; the next jump paints both again. */
     function clearSelection() {
       clearNativeSelection()
       clearRail()
-      selectedRange = null
       selectedAnchor = ''
       selectedRow = null
-      if (selectedBlock !== null && typeof selectedBlock.removeAttribute === 'function') {
-        try {
-          selectedBlock.removeAttribute('data-dsh-csearch-selected')
-        } catch (error) {
-          /* The node may have been replaced by a re-render. */
-        }
-      }
-      selectedBlock = null
-      try {
-        if (typeof document.querySelectorAll === 'function') {
-          for (const element of document.querySelectorAll('[data-dsh-csearch-selected]')) {
-            if (typeof element.removeAttribute === 'function') element.removeAttribute('data-dsh-csearch-selected')
-          }
-        }
-      } catch (error) {
-        /* No document to sweep. */
-      }
     }
 
-    /** Mark the landed paragraph; a no-op when the anchor is empty (a question-level jump). */
     /**
-     * Mark the paragraph the jump landed on.
+     * Mark where the jump landed.
      *
-     * One mechanism only: the block element carries the marker class. Painting a native range on
-     * some landings and an outline on others is what made the same action look different each time.
+     * The rail is the only visual: a tinted block was tried for a while, but it only worked when the
+     * raw anchor could be found in the rendered DOM (emoji, tables and code blocks broke it), so the
+     * rail — drawn from the paragraph's own range — is what readers actually get, every time.
      */
     function paintSelection(row, anchor) {
       const wanted = typeof anchor === 'string' ? anchor : ''
-      if (wanted !== '' && wanted === selectedAnchor && selectedRow === row && selectedBlock !== null) {
-        onRailScroll()
-        return true
+      if (wanted === '') {
+        clearSelection()
+        return false
       }
-      clearSelection()
-      if (wanted === '') return false
-      const marked = markParagraphBlock(row, wanted)
+      selectedAnchor = wanted
       selectedRow = row
-      /* The rail is the guarantee: even when the text anchor cannot be matched to an element
-         (emoji, tables, a renderer that reshapes a paragraph), the reader still sees where the
-         jump landed, on the left edge of the conversation. */
-      paintRail(selectedBlock !== null ? selectedBlock : row)
-      if (marked) selectedAnchor = wanted
-      return marked
+      const range = paragraphRange(row, wanted)
+      paintRail(row, range)
+      return range !== null
     }
 
     /** Remove every arrival marker (keywords + paragraph selection). It stays until the search changes. */
@@ -1774,7 +1686,29 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * Keep the arrival visible while the Chat view settles.
+     * Put the paragraph back under the middle of the scrollport after a reflow.
+     *
+     * The smooth scroll targets the layout at the time of the click; opening the panel (or a
+     * re-render) changes that layout, which is why a "centred" jump sometimes ends up low. This
+     * correction is instant and only fires when the offset is visible.
+     */
+    function correctCenter(row, anchor) {
+      const scroller = conversationScrollerOf(row)
+      if (scroller === null) return
+      const range = typeof anchor === 'string' && anchor !== '' ? paragraphRange(row, anchor) : null
+      const rect = range !== null ? range.getBoundingClientRect() : row.getBoundingClientRect()
+      if (rect === null || rect.height < 1) return
+      const box = scroller.getBoundingClientRect()
+      const delta = (rect.top - box.top) - (scroller.clientHeight - rect.height) / 2
+      if (Math.abs(delta) < 4) return
+      try {
+        scroller.scrollTop = scroller.scrollTop + delta
+      } catch (error) {
+        /* A scroller that no longer accepts writes is left as it is. */
+      }
+    }
+
+    /** Keep the arrival visible while the Chat view settles.
      *
      * A re-render replaces the text nodes the ranges point at, so the marker is rebuilt a few
      * times. A pass that finds the previous ranges still attached does nothing at all: repainting
@@ -1784,14 +1718,21 @@ window.__ModuleLoader__.load({
     function replayLanding(nodeKey, words, anchor) {
       for (const delay of [120, 400, 900, 1500]) {
         setTimeout(() => {
+          const rows = rowsOf(nodeKey)
+          const row = rows[0]
+          if (row === undefined) return
           if (lastPaint.key !== nodeKey || !rangesAlive(lastPaint.ranges)) {
-            const rows = rowsOf(nodeKey)
-            const row = rows[0]
-            if (row === undefined) return
             /* Only the first pass scrolls; later passes exist for the marker alone. */
             const ranges = paintHighlight(row, words, conversationScrollerOf(row), anchor)
             lastPaint = { key: nodeKey, ranges, anchor }
+            return
           }
+          /* The rail can be swept by the query effect that a mirrored search triggers right after
+             the jump; re-assert it on every pass so it cannot stay missing. */
+          paintSelection(row, anchor)
+          /* Opening the panel reflows the middle column, so the target drifts after the smooth
+             scroll ends. Correct the residual offset without animating it. */
+          correctCenter(row, anchor)
         }, delay)
       }
     }
