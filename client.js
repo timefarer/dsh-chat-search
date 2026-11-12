@@ -416,7 +416,7 @@ window.__ModuleLoader__.load({
       '.dsh-cg-paras{display:flex;flex-direction:column;gap:4px;padding:0 6px 8px}',
       '.dsh-cg-para{display:flex;flex-direction:column;gap:5px;width:100%;padding:8px 10px;border:.5px solid rgba(127,127,127,.28);border-radius:10px;background:var(--dsw-alias-bg-base);color:inherit;font:inherit;text-align:left;cursor:pointer;content-visibility:auto;contain-intrinsic-size:auto 76px}',
       '.dsh-cg-para:hover{border-color:var(--dsw-alias-brand-primary);background:rgba(74,144,255,.10);box-shadow:0 1px 6px rgba(0,0,0,.06)}',
-      '.dsh-cg-para--picked{border-color:var(--dsw-alias-brand-primary);box-shadow:inset 3px 0 0 var(--dsw-alias-brand-primary)}',
+      '.dsh-cg-para--picked{border-color:var(--dsw-alias-brand-primary);background:rgba(74,144,255,.14);box-shadow:inset 3px 0 0 var(--dsw-alias-brand-primary)}',
       '.dsh-cg-para:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-2px}',
       '.dsh-cg-para-meta{display:flex;align-items:center;gap:7px;color:var(--dsw-alias-label-secondary);font-size:11px}',
       '.dsh-cg-para-hits{padding:0 7px;border-radius:999px;background:color-mix(in srgb,var(--dsw-alias-brand-primary) 12%,transparent);color:var(--dsw-alias-brand-primary)}',
@@ -432,8 +432,7 @@ window.__ModuleLoader__.load({
       '.dsh-csearch-files{display:flex;flex-wrap:wrap;gap:4px}',
       '.dsh-csearch-file{max-width:100%;padding:1px 7px;border:.5px solid var(--dsw-alias-border-l1);border-radius:999px;color:var(--dsw-alias-label-secondary);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
       '::highlight(dsh-chat-search){background-color:rgba(255,199,0,.5);color:inherit}',
-      '::highlight(dsh-chat-search-selected){background-color:rgba(74,144,255,.18);color:inherit}',
-      '[data-dsh-csearch-selected]{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:3px;border-radius:4px}',
+      '[data-dsh-csearch-selected]{background:rgba(74,144,255,.14);border-radius:6px;box-shadow:inset 0 0 0 2px rgba(74,144,255,.55)}',
       '.dsh-csearch-highlight-layer{position:fixed;inset:0;z-index:900;pointer-events:none;overflow:hidden}',
       '.dsh-csearch-highlight{position:absolute;border-radius:2px;background:rgba(255,199,0,.5)}',
       '.dsh-csearch-results{display:flex;flex-direction:column;gap:2px}',
@@ -446,6 +445,8 @@ window.__ModuleLoader__.load({
       '.dsh-csearch-question{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dsw-alias-label-secondary);font-size:12px}',
       '.dsh-csearch-item{display:flex;flex-direction:column;gap:4px;width:100%;margin:0 0 2px;padding:7px 8px;border:.5px solid transparent;border-radius:9px;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer;content-visibility:auto;contain-intrinsic-size:auto 64px}',
       '.dsh-csearch-item:hover{background:var(--dsw-alias-bg-layer-2);border-color:var(--dsw-alias-border-l1)}',
+      /* Both lists use the same blue for "this is the row you opened last". */
+      '.dsh-csearch-item--picked{background:rgba(74,144,255,.14);border-color:var(--dsw-alias-brand-primary);box-shadow:inset 3px 0 0 var(--dsw-alias-brand-primary)}',
       '.dsh-csearch-go{margin-left:auto;opacity:0;color:var(--dsw-alias-brand-primary);font-size:11px;transition:opacity .12s}',
       '.dsh-csearch-item:hover .dsh-csearch-go,.dsh-csearch-item:focus-visible .dsh-csearch-go{opacity:1}',
       '.dsh-csearch-item:hover{border-color:var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2)}',
@@ -506,12 +507,14 @@ window.__ModuleLoader__.load({
     const panelSearches = new Map()
     const panelSearchListeners = new Set()
 
-    function requestPanelSearch(sessionId, query, scope, filters) {
+    function requestPanelSearch(sessionId, query, scope, filters, anchor) {
       if (typeof query !== 'string' || query.trim() === '') return
       panelSearches.set(sessionId, {
         query,
         scope: typeof scope === 'string' ? scope : 'all',
         filters: filters === undefined || filters === null ? null : normalizeFilters(filters),
+        /* The paragraph the jump landed on: the panel marks that row, so both lists agree. */
+        anchor: typeof anchor === 'string' ? anchor : '',
       })
       for (const listener of panelSearchListeners) {
         try {
@@ -1521,20 +1524,19 @@ window.__ModuleLoader__.load({
     }
 
     /** Mark the landed paragraph; a no-op when the anchor is empty (a question-level jump). */
+    /**
+     * Mark the paragraph the jump landed on.
+     *
+     * One mechanism only: the block element carries the marker class. Painting a native range on
+     * some landings and an outline on others is what made the same action look different each time.
+     */
     function paintSelection(row, anchor) {
       const wanted = typeof anchor === 'string' ? anchor : ''
-      if (wanted !== '' && wanted === selectedAnchor && selectedRow === row && selectedRange !== null && rangesAlive([selectedRange])) {
+      if (wanted !== '' && wanted === selectedAnchor && selectedRow === row && selectedBlock !== null) {
         return true
       }
       clearSelection()
       if (wanted === '') return false
-      const range = paragraphRange(row, wanted)
-      if (range !== null && applyNativeSelection(range)) {
-        selectedRange = range
-        selectedAnchor = wanted
-        selectedRow = row
-        return true
-      }
       const marked = markParagraphBlock(row, wanted)
       if (marked) {
         selectedAnchor = wanted
@@ -1894,6 +1896,18 @@ window.__ModuleLoader__.load({
     }
 
     /**
+     * Do two paragraph anchors name the same paragraph? The page and the panel cut anchors at
+     * slightly different lengths, so compare the shared prefix instead of the whole string.
+     */
+    function anchorMatches(left, right) {
+      const a = normalizeAnchor(left)
+      const b = normalizeAnchor(right)
+      if (a === '' || b === '') return false
+      const size = Math.min(32, a.length, b.length)
+      return size >= 8 && a.slice(0, size) === b.slice(0, size)
+    }
+
+    /**
      * Inline markdown the rendered text never shows: anchors are cut from the raw message, the DOM
      * holds the rendered form, so `**筛选窗口**` must compare equal to `筛选窗口`.
      */
@@ -2027,7 +2041,7 @@ window.__ModuleLoader__.load({
       if (jump !== null && jump !== undefined && typeof jump.seq === 'number') requestThrough(ctx, sessionId, jump.seq)
       /* Mirror the page's query into the panel so both entries behave the same afterwards. */
       if (jump !== null && jump !== undefined && typeof jump.query === 'string' && jump.query.trim() !== '') {
-        requestPanelSearch(sessionId, jump.query, panelScopeOf(jump.scope), jump.filters)
+        requestPanelSearch(sessionId, jump.query, panelScopeOf(jump.scope), jump.filters, jump.paragraph)
         /* Opening the tab right away is only the fast path: a cross-Session switch can remount the
            sidebar after this call, so the request stays pending until the Session is actually open. */
         requestPanelOpen(sessionId)
@@ -2261,6 +2275,8 @@ window.__ModuleLoader__.load({
       const [filters, setFilters] = useState(() => defaultFilters())
       const [filtersOpen, setFiltersOpen] = useState(false)
       const [scope, setScope] = useState('all')
+      /* The row that was opened last (or that a global jump landed on): both lists mark it the same. */
+      const [pickedAnchor, setPickedAnchor] = useState('')
       const [results, setResults] = useState(EMPTY_RESULTS)
       const [error, setError] = useState('')
       const [autoLoad, setAutoLoad] = useState(false)
@@ -2308,6 +2324,8 @@ window.__ModuleLoader__.load({
           setScope(request.scope)
           /* Same window as the page that jumped, or the two trees would show different Turns. */
           if (request.filters !== null && request.filters !== undefined) setFilters(request.filters)
+          /* The jump names the paragraph it landed on: mark that row once the results are in. */
+          setPickedAnchor(typeof request.anchor === 'string' ? request.anchor : '')
         }
         apply(takePanelSearch(sessionId))
         return onPanelSearchRequest((target) => {
@@ -2437,6 +2455,7 @@ window.__ModuleLoader__.load({
             return
           }
           setError('')
+          setPickedAnchor(item.kind === 'file' ? '' : item.anchor)
         },
         [t],
       )
@@ -2523,7 +2542,9 @@ window.__ModuleLoader__.load({
                   'button',
                   {
                     type: 'button',
-                    className: 'dsh-csearch-item',
+                    className: item.kind !== 'file' && anchorMatches(item.anchor, pickedAnchor)
+                      ? 'dsh-csearch-item dsh-csearch-item--picked'
+                      : 'dsh-csearch-item',
                     key: item.key + ':' + item.index,
                     'data-csearch-row': '',
                     title: t('jump.paraHint'),

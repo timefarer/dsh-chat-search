@@ -509,9 +509,18 @@ if (!/\.dsh-cg-page mark\{[^}]*rgba\(255,\s*199,\s*0/.test(code)) {
   console.error('FAIL: page keyword marks are not amber')
   process.exit(1)
 }
-/* The landed paragraph is blue, so it never reads as a keyword hit. */
-if (!/::highlight\(dsh-chat-search-selected\)\{[^}]*rgba\(74,\s*144,\s*255/.test(code)) {
+/* The landed paragraph is blue, so it never reads as a keyword hit, and it uses one mechanism. */
+if (!/\[data-dsh-csearch-selected\]\{[^}]*rgba\(74,\s*144,\s*255/.test(code)) {
   console.error('FAIL: the paragraph selection is not blue')
+  process.exit(1)
+}
+/* Both lists mark "the row you opened last" with the same class. */
+if (!/\.dsh-cg-para--picked\{[^}]*rgba\(74,\s*144,\s*255/.test(code)) {
+  console.error('FAIL: the page does not mark the picked row')
+  process.exit(1)
+}
+if (!/\.dsh-csearch-item--picked\{[^}]*rgba\(74,\s*144,\s*255/.test(code)) {
+  console.error('FAIL: the panel does not mark the picked row')
   process.exit(1)
 }
 if (!/\[data-dsh-csearch-selected\]/.test(code)) {
