@@ -1882,11 +1882,21 @@ window.__ModuleLoader__.load({
     }
 
     /** Bind Ctrl/Cmd+F to the in-conversation search, preferring the app's shortcut registry. */
+    /**
+     * Bind Ctrl/Cmd+F to the in-conversation search.
+     *
+     * The registry validates a command's defaults for every runtime before it stores anything, and
+     * the Web runtime only admits a short allow-list of combinations — `primary+KeyF` is not on it.
+     * Declaring a web default therefore refused the whole command, desktop included, and the app
+     * silently fell back to a DOM listener. So: register desktop defaults only, and let the page
+     * keep its own listener for the web, where no allowed default exists.
+     */
     function registerFindShortcut(ctx, t, open) {
       const shortcuts = ctx.get('shortcuts')
+      let disposeRegistry = null
       if (shortcuts !== undefined && shortcuts !== null && typeof shortcuts.register === 'function') {
         try {
-          return shortcuts.register({
+          disposeRegistry = shortcuts.register({
             id: 'conversation-search.find',
             label: () => t('command.find'),
             aliases: ['search conversation', 'find in conversation'],
@@ -1894,24 +1904,29 @@ window.__ModuleLoader__.load({
               'desktop:macos': { code: 'KeyF', modifiers: ['primary'] },
               'desktop:windows': { code: 'KeyF', modifiers: ['primary'] },
               'desktop:linux': { code: 'KeyF', modifiers: ['primary'] },
-              'web:macos': { code: 'KeyF', modifiers: ['primary'] },
-              'web:windows': { code: 'KeyF', modifiers: ['primary'] },
             },
             regions: ['page', 'editable'],
             modals: [],
             resolve: () => ({ status: 'handled', run: open }),
           })
         } catch (error) {
-          console.error('[conversation-search] shortcut registration was refused; using a DOM listener instead', error)
+          debugLog('shortcut registry refused the binding', { message: String(error && error.message) })
         }
       }
-      return registerDomFindShortcut(open)
+      /* Always keep the page listener: it is the only binding the Web runtime gets, and on desktop
+         it stays quiet because the registry handles the key first. */
+      const disposeDom = registerDomFindShortcut(open)
+      return () => {
+        if (typeof disposeRegistry === 'function') disposeRegistry()
+        disposeDom()
+      }
     }
 
-    /** Fallback binding for a profile whose shortcut registry is missing or already uses Ctrl+F. */
+    /** Page-level binding for Ctrl/Cmd+F; skipped when the shortcut registry already handled it. */
     function registerDomFindShortcut(open) {
       if (typeof document === 'undefined' || typeof document.addEventListener !== 'function') return () => {}
       const handler = (event) => {
+        if (event.defaultPrevented) return
         if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return
         if (typeof event.key !== 'string' || event.key.toLowerCase() !== 'f') return
         const target = event.target
@@ -1924,8 +1939,10 @@ window.__ModuleLoader__.load({
         event.preventDefault()
         open()
       }
-      document.addEventListener('keydown', handler, true)
-      return () => document.removeEventListener('keydown', handler, true)
+      /* Bubble phase on purpose: a registry binding on document/window runs first and marks the
+         event handled, so the two never both open the panel. */
+      document.addEventListener('keydown', handler, false)
+      return () => document.removeEventListener('keydown', handler, false)
     }
 
     /** Ask the Session to page in one more slice of older history. */

@@ -747,6 +747,13 @@ check(
   'find shortcut binds Ctrl/Cmd+F',
   findDefinition !== undefined && findDefinition.defaults['desktop:windows'].code === 'KeyF' && findDefinition.defaults['desktop:windows'].modifiers[0] === 'primary',
 )
+/* The Web runtime only admits a short allow-list; a rejected web default throws before anything is
+   stored, which would also drop the desktop binding. Keep the registry desktop-only. */
+check(
+  'find shortcut declares no web default',
+  findDefinition !== undefined && Object.keys(findDefinition.defaults).every((key) => !key.startsWith('web:')),
+  findDefinition === undefined ? 'no definition' : JSON.stringify(Object.keys(findDefinition.defaults)),
+)
 const resolution = findDefinition === undefined ? null : findDefinition.resolve()
 check('find shortcut resolves as handled', resolution !== null && resolution.status === 'handled', JSON.stringify(resolution))
 if (resolution !== null && resolution.status === 'handled') resolution.run()
