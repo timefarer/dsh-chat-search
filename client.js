@@ -474,6 +474,7 @@ window.__ModuleLoader__.load({
       '.dsh-csearch-file{max-width:100%;padding:1px 7px;border:.5px solid var(--dsw-alias-border-l1);border-radius:999px;color:var(--dsw-alias-label-secondary);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
       '::highlight(dsh-chat-search){background-color:rgba(255,199,0,.5);color:inherit}',
       '[data-dsh-csearch-selected]{background:rgba(74,144,255,.14);border-radius:6px;box-shadow:inset 0 0 0 2px rgba(74,144,255,.55)}',
+      '.dsh-csearch-rail{position:fixed;width:3px;border-radius:2px;background:rgba(74,144,255,.7);box-shadow:0 0 6px rgba(74,144,255,.45);pointer-events:none;z-index:60;transition:top .08s linear,height .08s linear}',
       '.dsh-csearch-highlight-layer{position:fixed;inset:0;z-index:900;pointer-events:none;overflow:hidden}',
       '.dsh-csearch-highlight{position:absolute;border-radius:2px;background:rgba(255,199,0,.5)}',
       '.dsh-csearch-results{display:flex;flex-direction:column;gap:2px}',
@@ -1249,6 +1250,80 @@ window.__ModuleLoader__.load({
     let selectedBlock = null
     let selectedAnchor = ''
     let selectedRow = null
+    /** Left-edge rail that always shows where the landed paragraph sits in the conversation. */
+    let railElement = null
+    let railTarget = null
+
+    /** Draw (or move) the left rail next to the landed paragraph. */
+    function paintRail(target) {
+      if (typeof document === 'undefined' || !document.body) return
+      if (railElement === null) {
+        try {
+          railElement = document.createElement('div')
+          railElement.className = 'dsh-csearch-rail'
+          railElement.setAttribute('aria-hidden', 'true')
+          document.body.appendChild(railElement)
+          document.addEventListener('scroll', onRailScroll, { capture: true, passive: true })
+          window.addEventListener('resize', onRailScroll)
+        } catch (error) {
+          railElement = null
+          return
+        }
+      }
+      railTarget = target
+      onRailScroll()
+    }
+
+    function onRailScroll() {
+      if (railElement === null || railTarget === null) return
+      let rect
+      try {
+        rect = railTarget.getBoundingClientRect()
+      } catch (error) {
+        railElement.style.display = 'none'
+        return
+      }
+      if (rect === null || rect.height < 1) {
+        railElement.style.display = 'none'
+        return
+      }
+      const scroller = selectedRow === null ? null : conversationScrollerOf(selectedRow)
+      let left = 2
+      let top = rect.top
+      let height = rect.height
+      if (scroller !== null) {
+        const box = scroller.getBoundingClientRect()
+        left = Math.max(0, box.left + 2)
+        top = Math.max(box.top, rect.top)
+        height = Math.min(rect.bottom, box.bottom) - top
+      }
+      if (height < 8) {
+        railElement.style.display = 'none'
+        return
+      }
+      railElement.style.display = 'block'
+      railElement.style.left = left + 'px'
+      railElement.style.top = Math.max(0, top) + 'px'
+      railElement.style.height = Math.min(height, window.innerHeight - Math.max(0, top)) + 'px'
+    }
+
+    function clearRail() {
+      railTarget = null
+      if (railElement !== null) {
+        try {
+          railElement.remove()
+        } catch (error) {
+          /* The layer may already be gone with its document. */
+        }
+        railElement = null
+      }
+      if (typeof document !== 'undefined' && typeof document.removeEventListener === 'function') {
+        document.removeEventListener('scroll', onRailScroll, true)
+      }
+      if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+        window.removeEventListener('resize', onRailScroll)
+      }
+    }
 
     /** Native text highlight: the browser-find look, anchored to the text so it scrolls with it. */
     function applyNativeHighlight(ranges) {
@@ -1516,6 +1591,29 @@ window.__ModuleLoader__.load({
       }
     }
 
+    /** Debug dump of one message's element tree, so a failed anchor match can be diagnosed. */
+    function dumpRowStructure(row) {
+      if (!debugEnabled()) return
+      const describe = (element) => ({
+        tag: element.tagName,
+        cls: String(element.className || '').slice(0, 40),
+        len: String(element.textContent || '').length,
+        head: String(element.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 40),
+      })
+      const children = []
+      try {
+        const all = row.querySelectorAll('*')
+        for (let index = 0; index < all.length && children.length < 14; index += 1) {
+          const element = all[index]
+          if (String(element.textContent || '') === '') continue
+          children.push(describe(element))
+        }
+      } catch (error) {
+        /* Nothing to dump without a DOM. */
+      }
+      debugLog('selection: row structure', { row: describe(row), children })
+    }
+
     /** Fallback for a build without the Custom Highlight API: outline the paragraph's block. */
     function markParagraphBlock(row, anchor) {
       const needle = normalizeAnchor(anchor)
@@ -1537,6 +1635,7 @@ window.__ModuleLoader__.load({
       }
       if (match === null || typeof match.setAttribute !== 'function') {
         debugLog('selection: no element carried the anchor', { anchor: needle.slice(0, 60) })
+        dumpRowStructure(row)
         return false
       }
       debugLog('selection: marked', { tag: match.tagName, className: String(match.className || '').slice(0, 60), length: matchLength })
@@ -1552,6 +1651,7 @@ window.__ModuleLoader__.load({
     /** Drop the paragraph selection (native wash, fallback outline and the remembered range). */
     function clearSelection() {
       clearNativeSelection()
+      clearRail()
       selectedRange = null
       selectedAnchor = ''
       selectedRow = null
@@ -1584,15 +1684,18 @@ window.__ModuleLoader__.load({
     function paintSelection(row, anchor) {
       const wanted = typeof anchor === 'string' ? anchor : ''
       if (wanted !== '' && wanted === selectedAnchor && selectedRow === row && selectedBlock !== null) {
+        onRailScroll()
         return true
       }
       clearSelection()
       if (wanted === '') return false
       const marked = markParagraphBlock(row, wanted)
-      if (marked) {
-        selectedAnchor = wanted
-        selectedRow = row
-      }
+      selectedRow = row
+      /* The rail is the guarantee: even when the text anchor cannot be matched to an element
+         (emoji, tables, a renderer that reshapes a paragraph), the reader still sees where the
+         jump landed, on the left edge of the conversation. */
+      paintRail(selectedBlock !== null ? selectedBlock : row)
+      if (marked) selectedAnchor = wanted
       return marked
     }
 
