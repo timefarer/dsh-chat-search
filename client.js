@@ -33,6 +33,46 @@ window.__ModuleLoader__.load({
       if (typeof console === 'undefined' || typeof console.debug !== 'function') return
       console.debug(`[dsh-chat-search] ${message}`, detail)
     }
+
+    /**
+     * Dev-only probe, so a report can say what the browser actually sees instead of guessing:
+     * `__dshChatSearchProbe()` in DevTools returns the build, whether this build's CSS is loaded,
+     * and what (if anything) carries the paragraph marker right now.
+     */
+    function installProbe() {
+      if (typeof window === 'undefined') return
+      window.__dshChatSearchProbe = () => {
+        const marked = typeof document !== 'undefined' ? document.querySelector('[data-dsh-csearch-selected]') : null
+        let pickedRuleLoaded = false
+        let selectionRuleLoaded = false
+        try {
+          const sheets = document.styleSheets || []
+          for (let index = 0; index < sheets.length; index += 1) {
+            const rules = sheets[index].cssRules || []
+            for (let rule = 0; rule < rules.length; rule += 1) {
+              const selector = String(rules[rule].selectorText || '')
+              if (selector.indexOf('--picked') >= 0) pickedRuleLoaded = true
+              if (selector.indexOf('data-dsh-csearch-selected') >= 0) selectionRuleLoaded = true
+            }
+          }
+        } catch (error) {
+          /* A cross-origin sheet cannot be read; the two flags stay false and say so. */
+        }
+        return {
+          build: BUILD,
+          pickedRuleLoaded,
+          selectionRuleLoaded,
+          selected: marked === null ? null : {
+            tag: marked.tagName,
+            className: String(marked.className || '').slice(0, 80),
+            textLength: String(marked.textContent || '').length,
+            text: String(marked.textContent || '').slice(0, 80),
+            background: getComputedStyle(marked).backgroundColor,
+            shadow: getComputedStyle(marked).boxShadow,
+          },
+        }
+      }
+    }
     /** Result and highlight budgets keep one search bounded on a very long log. */
     const MAX_RESULTS = 200
     const MAX_WORD_HITS = 60
@@ -392,7 +432,7 @@ window.__ModuleLoader__.load({
       '.dsh-cg-link:hover{border-color:var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}',
       '.dsh-cg-tree{display:flex;flex-direction:column;gap:10px}',
       '.dsh-cg-tree[data-loading="true"]{opacity:.55}',
-      '.dsh-cg-session{border:.5px solid var(--dsw-alias-border-l1);border-radius:12px;background:var(--dsw-alias-bg-layer-1);overflow:hidden;content-visibility:auto;contain-intrinsic-size:auto 140px}',
+      '.dsh-cg-session{border:.5px solid var(--dsw-alias-border-l1);border-radius:12px;background:var(--dsw-alias-bg-layer-1);overflow:hidden}',
       '.dsh-cg-session[data-open="true"]{border-color:var(--dsw-alias-border-l2)}',
       '.dsh-cg-session-top{display:flex;align-items:center;gap:8px;padding:9px 10px 0}',
       '.dsh-cg-toggle{display:flex;align-items:center;gap:7px;flex:1;min-width:0;padding:3px 4px;border:0;border-radius:8px;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}',
@@ -414,7 +454,7 @@ window.__ModuleLoader__.load({
       '.dsh-cg-q-tag{flex:none;color:var(--dsw-alias-brand-primary);font-size:11px;font-weight:600;white-space:nowrap}',
       '.dsh-cg-q-text{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;line-height:1.5}',
       '.dsh-cg-paras{display:flex;flex-direction:column;gap:4px;padding:0 6px 8px}',
-      '.dsh-cg-para{display:flex;flex-direction:column;gap:5px;width:100%;padding:8px 10px;border:.5px solid rgba(127,127,127,.28);border-radius:10px;background:var(--dsw-alias-bg-base);color:inherit;font:inherit;text-align:left;cursor:pointer;content-visibility:auto;contain-intrinsic-size:auto 76px}',
+      '.dsh-cg-para{display:flex;flex-direction:column;gap:5px;width:100%;padding:8px 10px;border:.5px solid rgba(127,127,127,.28);border-radius:10px;background:var(--dsw-alias-bg-base);color:inherit;font:inherit;text-align:left;cursor:pointer;transition:background-color .12s ease,border-color .12s ease,box-shadow .12s ease}',
       '.dsh-cg-para:hover{border-color:var(--dsw-alias-brand-primary);background:rgba(74,144,255,.10);box-shadow:0 1px 6px rgba(0,0,0,.06)}',
       '.dsh-cg-para--picked{border-color:var(--dsw-alias-brand-primary);background:rgba(74,144,255,.14);box-shadow:inset 3px 0 0 var(--dsw-alias-brand-primary)}',
       '.dsh-cg-para--picked:hover{background:rgba(74,144,255,.2)}',
@@ -444,7 +484,7 @@ window.__ModuleLoader__.load({
       '.dsh-csearch-group-head{display:flex;align-items:baseline;gap:6px;padding:5px 4px;position:sticky;top:0;z-index:1;background:var(--dsw-specific-sidebar-fill,var(--dsw-alias-bg-base))}',
       '.dsh-csearch-turn{flex:none;color:var(--dsw-alias-brand-primary);font-size:11px;font-weight:600;letter-spacing:.02em}',
       '.dsh-csearch-question{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dsw-alias-label-secondary);font-size:12px}',
-      '.dsh-csearch-item{display:flex;flex-direction:column;gap:4px;width:100%;margin:0 0 2px;padding:7px 8px;border:.5px solid transparent;border-radius:9px;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer;content-visibility:auto;contain-intrinsic-size:auto 64px}',
+      '.dsh-csearch-item{display:flex;flex-direction:column;gap:4px;width:100%;margin:0 0 2px;padding:7px 8px;border:.5px solid transparent;border-radius:9px;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer;transition:background-color .12s ease,border-color .12s ease,box-shadow .12s ease}',
       '.dsh-csearch-item:hover{background:rgba(74,144,255,.08);border-color:var(--dsw-alias-brand-primary)}',
       /* Both lists use the same blue for "this is the row you opened last". */
       '.dsh-csearch-item--picked{background:rgba(74,144,255,.14);border-color:var(--dsw-alias-brand-primary);box-shadow:inset 3px 0 0 var(--dsw-alias-brand-primary)}',
@@ -1495,7 +1535,11 @@ window.__ModuleLoader__.load({
           matchLength = text.length
         }
       }
-      if (match === null || typeof match.setAttribute !== 'function') return false
+      if (match === null || typeof match.setAttribute !== 'function') {
+        debugLog('selection: no element carried the anchor', { anchor: needle.slice(0, 60) })
+        return false
+      }
+      debugLog('selection: marked', { tag: match.tagName, className: String(match.className || '').slice(0, 60), length: matchLength })
       try {
         match.setAttribute('data-dsh-csearch-selected', 'true')
         selectedBlock = match
@@ -3486,6 +3530,7 @@ window.__ModuleLoader__.load({
 
       ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'conversation-search: dictionaries')
       ctx.effect(() => insertStyles(), 'conversation-search: styles')
+      ctx.effect(() => installProbe(), 'conversation-search: probe')
       ctx.effect(() => registerFindShortcut(ctx, t, () => openSearchTab(ctx, null)), 'conversation-search: find shortcut')
 
       ctx.effect(
