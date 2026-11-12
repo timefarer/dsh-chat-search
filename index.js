@@ -941,19 +941,28 @@ function searchCorpus(corpus, query, scope, started, filters) {
         const questionSeq = anchorPart === undefined ? question.seq : anchorPart.seq
         const matchedFiles = matchedPart !== undefined && spec.question ? matchesFiles(matchedPart.files, words) : []
         const paragraphs = []
+        /* File rows name files; they are not paragraphs, so they never consume a number. The
+           panel skips them the same way, which keeps "第 N 段" identical in both views. */
+        let paragraphIndex = 0
+        let paragraphTotal = 0
         for (let index = 0; index < question.paragraphs.length; index += 1) {
           const paragraph = question.paragraphs[index]
-          const textMatched = spec.paragraph && paragraph.kind !== 'file' && containsAll(paragraph.text, words)
+          const isFile = paragraph.kind === 'file'
+          if (!isFile) {
+            paragraphIndex += 1
+            paragraphTotal += 1
+          }
+          const textMatched = spec.paragraph && !isFile && containsAll(paragraph.text, words)
           const fileHits = spec.paragraph ? matchesFiles(paragraph.files, words) : []
           if (!textMatched && fileHits.length === 0) continue
           paragraphCount += 1
           paragraphs.push({
             seq: paragraph.seq,
-            index: index + 1,
+            index: isFile ? 0 : paragraphIndex,
             turn: questionNumber,
-            kind: paragraph.kind === 'file' ? 'file' : 'text',
-            text: paragraph.kind === 'file' ? '' : snippetOf(paragraph.text, words, SNIPPET_CHARS),
-            anchor: paragraph.kind === 'file' ? paragraph.files[0] || '' : paragraph.text.slice(0, ANCHOR_CHARS),
+            kind: isFile ? 'file' : 'text',
+            text: isFile ? '' : snippetOf(paragraph.text, words, SNIPPET_CHARS),
+            anchor: isFile ? paragraph.files[0] || '' : paragraph.text.slice(0, ANCHOR_CHARS),
             hits: (textMatched ? countHits(paragraph.text, words) : 0) + fileHits.length,
             matched: true,
             textMatched,
@@ -971,7 +980,7 @@ function searchCorpus(corpus, query, scope, started, filters) {
           textMatched: partTextHit !== undefined,
           inputFiles: questionFiles,
           matchedFiles,
-          paragraphTotal: question.paragraphs.length,
+          paragraphTotal: paragraphTotal,
           paragraphs: paragraphs.slice(0, MAX_RESULT_PARAGRAPHS),
         })
         questionCount += 1

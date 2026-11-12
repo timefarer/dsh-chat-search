@@ -561,7 +561,8 @@ check('assistant role label', panelText.includes('回复'))
 check('user role label', panelText.includes('提问'))
 check('unrelated paragraph excluded', !panelText.includes('这一段落与搜索词无关'))
 
-/* The second reply message of Turn 1: paragraph numbers continue across messages. */
+/* The second reply message of Turn 1: paragraph numbers continue across messages, and the file
+   row of the first message must not consume a number (the Host numbers paragraphs the same way). */
 let offsetTree = await settle('panel-offset', bodyRegistration.Component, panelProps)
 const offsetInput = findNode(offsetTree, 'dsh-csearch-input')
 if (offsetInput !== null) offsetInput.props.onChange({ target: { value: '补记一句话' } })
@@ -570,7 +571,7 @@ const offsetText = flatten(offsetTree).join('|')
 check('a second reply message keeps its Turn', offsetText.includes('第 1 轮'), offsetText.slice(0, 200))
 check(
   'paragraph numbers continue across reply messages',
-  offsetText.includes('第 5 段'),
+  offsetText.includes('第 4 段'),
   offsetText.slice(0, 300),
 )
 

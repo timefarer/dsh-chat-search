@@ -328,6 +328,21 @@ check(
   JSON.stringify(turnOneSession.questions[0].paragraphs[0].index),
 )
 
+/* A file row names files; it must not take a paragraph number (the panel skips it the same way). */
+const fileOnlyHit = await post({ action: 'search', query: 'sb.css', scope: 'paragraph' })
+const fileOnlyParagraph = fileOnlyHit.body.value.sessions[0].questions[0].paragraphs[0]
+check(
+  'turns: a file row is not numbered',
+  fileOnlyParagraph.kind === 'file' && fileOnlyParagraph.index === 0,
+  JSON.stringify({ kind: fileOnlyParagraph.kind, index: fileOnlyParagraph.index }),
+)
+const afterFileHit = await post({ action: 'search', query: '具体做法', scope: 'paragraph' })
+check(
+  'turns: a text paragraph after a file row keeps its own number',
+  afterFileHit.body.value.sessions[0].questions[0].paragraphs[0].index === 2,
+  JSON.stringify(afterFileHit.body.value.sessions[0].questions[0].paragraphs[0].index),
+)
+
 const steering = await post({ action: 'search', query: '补充提问的锚点', scope: 'question' })
 const steeringSession = steering.body.value.sessions[0]
 check('turns: a second user message does not add a question row', steeringSession.questionTotal === 3, String(steeringSession.questionTotal))

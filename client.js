@@ -416,6 +416,7 @@ window.__ModuleLoader__.load({
       '.dsh-cg-paras{display:flex;flex-direction:column;gap:4px;padding:0 6px 8px}',
       '.dsh-cg-para{display:flex;flex-direction:column;gap:5px;width:100%;padding:8px 10px;border:.5px solid rgba(127,127,127,.28);border-radius:10px;background:var(--dsw-alias-bg-base);color:inherit;font:inherit;text-align:left;cursor:pointer;content-visibility:auto;contain-intrinsic-size:auto 76px}',
       '.dsh-cg-para:hover{border-color:var(--dsw-alias-brand-primary);background:rgba(74,144,255,.10);box-shadow:0 1px 6px rgba(0,0,0,.06)}',
+      '.dsh-cg-para--picked{border-color:var(--dsw-alias-brand-primary);box-shadow:inset 3px 0 0 var(--dsw-alias-brand-primary)}',
       '.dsh-cg-para:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-2px}',
       '.dsh-cg-para-meta{display:flex;align-items:center;gap:7px;color:var(--dsw-alias-label-secondary);font-size:11px}',
       '.dsh-cg-para-hits{padding:0 7px;border-radius:999px;background:color-mix(in srgb,var(--dsw-alias-brand-primary) 12%,transparent);color:var(--dsw-alias-brand-primary)}',
@@ -540,7 +541,7 @@ window.__ModuleLoader__.load({
     }
 
     /** What the global page shows when the reader comes back to it. */
-    const globalMemory = { query: '', scope: 'all', result: null, status: 'idle', error: '' }
+    const globalMemory = { query: '', scope: 'all', result: null, status: 'idle', error: '', picked: '' }
 
     /** Recent global queries, newest first; page memory only, never persisted. */
     const recentQueries = []
@@ -1028,8 +1029,9 @@ window.__ModuleLoader__.load({
         const content = textOfNode(node, role)
         if (content.text === '' && content.files.length === 0) continue
         const units = messageUnits(node, content.text, content.files)
+        const numbered = textUnitCount(units)
         const base = role === 'assistant' ? turnOffsets.get(turn) || 0 : 0
-        if (role === 'assistant') turnOffsets.set(turn, base + units.length)
+        if (role === 'assistant') turnOffsets.set(turn, base + numbered)
         for (const unit of units) {
           const textMatched = unit.text !== '' && containsAll(unit.text, words)
           const fileHits = matchesFiles(unit.files, words)
@@ -1047,7 +1049,7 @@ window.__ModuleLoader__.load({
             role,
             index: role === 'assistant' ? base + unit.index : unit.index,
             kind: unit.kind,
-            total: units.length,
+            total: numbered,
             anchor: unit.kind === 'file' ? unit.files[0] || '' : unit.text.slice(0, PARAGRAPH_ANCHOR_CHARS),
             hits: (textMatched ? countHits(unit.text, words) : 0) + fileHits.length,
             textMatched,
@@ -1067,10 +1069,17 @@ window.__ModuleLoader__.load({
     function messageUnits(node, text, files) {
       const paragraphs = paragraphsOf(node, text)
       const units = paragraphs.map((paragraph, index) => ({ kind: 'text', text: paragraph, index: index + 1, files: [] }))
+      /* A file row names files, it is not a paragraph: it must not take a number, otherwise the
+         panel and the Host drift apart by one for every tool-only step in the Turn. */
       if (files.length > 0 && !files.every((name) => text.includes(name))) {
-        units.push({ kind: 'file', text: '', index: units.length + 1, files })
+        units.push({ kind: 'file', text: '', index: 0, files })
       }
       return units
+    }
+
+    /** How many numbered paragraphs these units carry (file rows excluded). */
+    function textUnitCount(units) {
+      return units.reduce((count, unit) => (unit.kind === 'text' ? count + 1 : count), 0)
     }
 
     /** The file names that satisfy every keyword on their own. */
@@ -1436,10 +1445,20 @@ window.__ModuleLoader__.load({
       if (needle === '') return null
       const built = normalizedTextMap(row)
       if (built === null || built.map.length === 0) return null
-      const at = built.text.toLowerCase().indexOf(needle)
+      const lowered = built.text.toLowerCase()
+      /* A long anchor can still miss when the renderer drops more than inline markers (a link
+         target, an emoji shortcode): fall back to a shorter prefix of the same paragraph. */
+      let at = lowered.indexOf(needle)
+      let length = needle.length
+      for (const cut of [120, 80, 50, 30]) {
+        if (at >= 0) break
+        if (needle.length <= cut) continue
+        at = lowered.indexOf(needle.slice(0, cut))
+        length = cut
+      }
       if (at < 0) return null
       const start = built.map[at]
-      const end = built.map[Math.min(built.map.length - 1, at + needle.length - 1)]
+      const end = built.map[Math.min(built.map.length - 1, at + length - 1)]
       if (start === undefined || end === undefined) return null
       try {
         const range = document.createRange()
@@ -1458,7 +1477,8 @@ window.__ModuleLoader__.load({
       let match = null
       let matchLength = 0
       for (const element of row.querySelectorAll('p,li,pre,blockquote,td,th,h1,h2,h3,h4,h5,h6')) {
-        const text = typeof element.textContent === 'string' ? element.textContent.toLowerCase().replace(/\s+/g, ' ').trim() : ''
+        const raw = typeof element.textContent === 'string' ? element.textContent : ''
+        const text = stripInlineMarkdown(raw).toLowerCase().replace(/\s+/g, ' ').trim()
         if (text.indexOf(needle) < 0) continue
         if (match === null || text.length < matchLength) {
           match = element
@@ -1870,7 +1890,22 @@ window.__ModuleLoader__.load({
 
     function normalizeAnchor(value) {
       if (value === undefined || value === null) return ''
-      return String(value).toLowerCase().replace(/\s+/g, ' ').trim()
+      return stripInlineMarkdown(String(value)).toLowerCase().replace(/\s+/g, ' ').trim()
+    }
+
+    /**
+     * Inline markdown the rendered text never shows: anchors are cut from the raw message, the DOM
+     * holds the rendered form, so `**筛选窗口**` must compare equal to `筛选窗口`.
+     */
+    function stripInlineMarkdown(value) {
+      return String(value)
+        .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
+        .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+        .replace(/`{1,3}([^`]*)`{1,3}/g, '$1')
+        .replace(/\*\*([^*]+)\*\*/g, '$1')
+        .replace(/__([^_]+)__/g, '$1')
+        .replace(/\*([^*]+)\*/g, '$1')
+        .replace(/~~([^~]+)~~/g, '$1')
     }
 
     /**
@@ -2877,9 +2912,14 @@ window.__ModuleLoader__.load({
         },
         [openTarget, resultWords, titleOf, jumpQuery, scope, filters],
       )
+      /* The row that was opened last stays marked, so coming back to this page shows where you went. */
+      const [picked, setPicked] = useState(() => globalMemory.picked || '')
+      const pickKey = (session, question, paragraph) => session.id + '|' + question.seq + '|' + paragraph.anchor
       const openParagraph = useCallback(
         (session, question, paragraph) => {
           setPendingRow(question.seq + ':' + paragraph.index)
+          setPicked(pickKey(session, question, paragraph))
+          globalMemory.picked = pickKey(session, question, paragraph)
           openTarget(
             session.id,
             {
@@ -2888,6 +2928,7 @@ window.__ModuleLoader__.load({
               words: resultWords,
               anchor: paragraph.anchor,
               paragraph: paragraph.anchor,
+              index: paragraph.index,
               turn: paragraph.turn,
               query: jumpQuery,
               scope,
@@ -2907,7 +2948,7 @@ window.__ModuleLoader__.load({
           'button',
           {
             type: 'button',
-            className: 'dsh-cg-para',
+            className: picked !== '' && picked === pickKey(session, question, paragraph) ? 'dsh-cg-para dsh-cg-para--picked' : 'dsh-cg-para',
             key: question.seq + ':' + paragraph.index,
             'data-csearch-row': '',
             title: t('jump.paraHint'),
