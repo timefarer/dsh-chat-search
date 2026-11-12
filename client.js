@@ -417,6 +417,7 @@ window.__ModuleLoader__.load({
       '.dsh-cg-para{display:flex;flex-direction:column;gap:5px;width:100%;padding:8px 10px;border:.5px solid rgba(127,127,127,.28);border-radius:10px;background:var(--dsw-alias-bg-base);color:inherit;font:inherit;text-align:left;cursor:pointer;content-visibility:auto;contain-intrinsic-size:auto 76px}',
       '.dsh-cg-para:hover{border-color:var(--dsw-alias-brand-primary);background:rgba(74,144,255,.10);box-shadow:0 1px 6px rgba(0,0,0,.06)}',
       '.dsh-cg-para--picked{border-color:var(--dsw-alias-brand-primary);background:rgba(74,144,255,.14);box-shadow:inset 3px 0 0 var(--dsw-alias-brand-primary)}',
+      '.dsh-cg-para--picked:hover{background:rgba(74,144,255,.2)}',
       '.dsh-cg-para:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-2px}',
       '.dsh-cg-para-meta{display:flex;align-items:center;gap:7px;color:var(--dsw-alias-label-secondary);font-size:11px}',
       '.dsh-cg-para-hits{padding:0 7px;border-radius:999px;background:color-mix(in srgb,var(--dsw-alias-brand-primary) 12%,transparent);color:var(--dsw-alias-brand-primary)}',
@@ -444,9 +445,11 @@ window.__ModuleLoader__.load({
       '.dsh-csearch-turn{flex:none;color:var(--dsw-alias-brand-primary);font-size:11px;font-weight:600;letter-spacing:.02em}',
       '.dsh-csearch-question{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dsw-alias-label-secondary);font-size:12px}',
       '.dsh-csearch-item{display:flex;flex-direction:column;gap:4px;width:100%;margin:0 0 2px;padding:7px 8px;border:.5px solid transparent;border-radius:9px;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer;content-visibility:auto;contain-intrinsic-size:auto 64px}',
-      '.dsh-csearch-item:hover{background:var(--dsw-alias-bg-layer-2);border-color:var(--dsw-alias-border-l1)}',
+      '.dsh-csearch-item:hover{background:rgba(74,144,255,.08);border-color:var(--dsw-alias-brand-primary)}',
       /* Both lists use the same blue for "this is the row you opened last". */
       '.dsh-csearch-item--picked{background:rgba(74,144,255,.14);border-color:var(--dsw-alias-brand-primary);box-shadow:inset 3px 0 0 var(--dsw-alias-brand-primary)}',
+      /* Hovering the picked row must not wipe its marker: it is the same row, slightly stronger. */
+      '.dsh-csearch-item--picked:hover{background:rgba(74,144,255,.2);border-color:var(--dsw-alias-brand-primary)}',
       '.dsh-csearch-go{margin-left:auto;opacity:0;color:var(--dsw-alias-brand-primary);font-size:11px;transition:opacity .12s}',
       '.dsh-csearch-item:hover .dsh-csearch-go,.dsh-csearch-item:focus-visible .dsh-csearch-go{opacity:1}',
       '.dsh-csearch-item:hover{border-color:var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2)}',
@@ -1478,12 +1481,16 @@ window.__ModuleLoader__.load({
       const needle = normalizeAnchor(anchor)
       if (needle === '' || typeof row.querySelectorAll !== 'function') return false
       let match = null
-      let matchLength = 0
-      for (const element of row.querySelectorAll('p,li,pre,blockquote,td,th,h1,h2,h3,h4,h5,h6')) {
+      let matchLength = Number.POSITIVE_INFINITY
+      /* Any element, not a fixed tag list: the chat renderer is free to use divs or spans, and a
+         tag whitelist is exactly why the marker sometimes never appeared. The smallest element
+         whose text contains the anchor is the paragraph, whatever it is made of. */
+      for (const element of row.querySelectorAll('*')) {
         const raw = typeof element.textContent === 'string' ? element.textContent : ''
+        if (raw === '') continue
         const text = stripInlineMarkdown(raw).toLowerCase().replace(/\s+/g, ' ').trim()
         if (text.indexOf(needle) < 0) continue
-        if (match === null || text.length < matchLength) {
+        if (text.length < matchLength) {
           match = element
           matchLength = text.length
         }
@@ -1587,10 +1594,20 @@ window.__ModuleLoader__.load({
     function scrollAndPaint(row, words, anchor) {
       const scroller = conversationScrollerOf(row)
       const ranges = paintHighlight(row, words, scroller, anchor)
+      /* Centre on the paragraph itself, not on the first keyword: a target that is already on
+         screen must still move to the middle, which is what "jump" means to a reader. */
+      const paragraph = typeof anchor === 'string' ? paragraphRange(row, anchor) : null
+      const focus = paragraph !== null ? paragraph.getBoundingClientRect() : null
       if (scroller !== null) {
-        const rect = ranges.length > 0 ? ranges[0].getBoundingClientRect() : row.getBoundingClientRect()
+        const rect = focus !== null && focus.height > 0
+          ? focus
+          : ranges.length > 0
+            ? ranges[0].getBoundingClientRect()
+            : row.getBoundingClientRect()
         centerInScroller(scroller, rect.top, rect.height)
-      } else {
+      } else if (focus !== null && focus.height > 0 && typeof row.scrollIntoView === 'function') {
+        row.scrollIntoView({ block: 'center', behavior: prefersReducedMotion() ? 'auto' : 'smooth' })
+      } else if (typeof row.scrollIntoView === 'function') {
         row.scrollIntoView({ block: 'center', behavior: prefersReducedMotion() ? 'auto' : 'smooth' })
       }
       return ranges
