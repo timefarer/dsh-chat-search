@@ -295,6 +295,14 @@ check('session scope ignores file names', sessionScopeFile.body.value.sessions.l
 
 const readPath = await post({ action: 'search', query: 'guide.md', scope: 'all' })
 check('read-tool paths are indexed', readPath.body.value.sessions.length === 1, JSON.stringify(readPath.body.value.stats))
+/* The performance baseline lives in the reply: index build, pure match, and total. */
+check(
+  'stats carry the timing baseline',
+  typeof readPath.body.value.stats.buildMs === 'number' &&
+    typeof readPath.body.value.stats.matchMs === 'number' &&
+    typeof readPath.body.value.stats.tookMs === 'number',
+  JSON.stringify(readPath.body.value.stats),
+)
 
 const patched = await post({ action: 'search', query: 'panel.ts', scope: 'paragraph' })
 check('apply_patch paths are indexed', patched.body.value.stats.paragraphs >= 1, JSON.stringify(patched.body.value.stats))

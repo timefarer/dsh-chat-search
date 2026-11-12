@@ -182,7 +182,14 @@ async function handleRequest(ctx, index, recent, filters, responseCache, req, re
       query,
       scope,
       sessions: base.sessions,
-      stats: { ...base.stats, tookMs: Date.now() - started, cached: !fresh },
+      stats: {
+        ...base.stats,
+        tookMs: Date.now() - started,
+        cached: !fresh,
+        /* Index timing travels with every reply, cached or not: that is the number to optimise. */
+        buildMs: index.buildMs(),
+        indexAgeMs: Date.now() - index.builtAt(),
+      },
     }
     /* Recorded only after the search succeeded, so a failed request never enters history. */
     value.recent = await recent.remember(query)
@@ -884,6 +891,7 @@ function emptyResult(query, scope, started) {
       paragraphs: 0,
       indexed: 0,
       truncated: false,
+      matchMs: 0,
       tookMs: Date.now() - started,
     },
   }
@@ -896,6 +904,7 @@ function emptyResult(query, scope, started) {
  * containers needed to place them), each flagged with which layer actually hit the keywords.
  */
 function searchCorpus(corpus, query, scope, started, filters) {
+  const matchStarted = Date.now()
   const words = normalizeWords(query)
   const spec = SCOPES[scope]
   const sinceMs = dayStartMs(filters.since)
@@ -1014,6 +1023,8 @@ function searchCorpus(corpus, query, scope, started, filters) {
       paragraphs: paragraphCount,
       indexed: corpus.size,
       truncated,
+      /* matchMs is the pure matching cost; tookMs also carries index build and response shaping. */
+      matchMs: Date.now() - matchStarted,
       tookMs: Date.now() - started,
     },
   }

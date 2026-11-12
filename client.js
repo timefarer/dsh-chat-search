@@ -60,6 +60,7 @@ window.__ModuleLoader__.load({
           /* Which marker path is live right now, so a lag report can be answered without guessing. */
           nativeHighlight: typeof CSS !== 'undefined' && CSS !== null && Boolean(CSS.highlights),
           overlayBoxes: highlightBoxes.length,
+          jumpMs: jumpTiming.lastMs,
           rail: railElement === null ? null : {
             display: getComputedStyle(railElement).display,
             top: getComputedStyle(railElement).top,
@@ -610,6 +611,8 @@ window.__ModuleLoader__.load({
 
     /** Jumps waiting for their Session to finish loading, keyed by Session id. */
     const pendingJumps = new Map()
+    /** Click-to-landing clock: `requestedAt` when a jump starts, `lastMs` once it lands. */
+    const jumpTiming = { requestedAt: 0, lastMs: 0 }
     /** Readers currently showing a Session that may be asked to jump next. */
     const jumpListeners = new Set()
 
@@ -1701,6 +1704,10 @@ window.__ModuleLoader__.load({
         return false
       }
       lastPaint = { key: nodeKey, ranges: scrollAndPaint(row, words, anchor), anchor }
+      /* Click (or panel pick) to a visible landing marker: the number performance work must move. */
+      jumpTiming.lastMs = Date.now() - (jumpTiming.requestedAt === 0 ? Date.now() : jumpTiming.requestedAt)
+      jumpTiming.requestedAt = 0
+      debugLog('jump: landed', { jumpMs: jumpTiming.lastMs })
       userScrolledSinceJump = false
       replayLanding(nodeKey, words, anchor)
       return true
@@ -2165,6 +2172,8 @@ window.__ModuleLoader__.load({
       }
       /* Feedback first: the indicator appears at once, so the click is always acknowledged. */
       beginOpening(sessionId, title, jump === null || jump === undefined ? null : { kind: jump.kind, turn: jump.turn })
+      /* Click-to-landing clock starts here, before the Session switch, so it includes everything. */
+      jumpTiming.requestedAt = Date.now()
       if (jump !== null && jump !== undefined) requestJump(sessionId, jump)
       try {
         /* Opening a Session also reveals the conversation panel (it selects the null panel id). */
@@ -3443,6 +3452,10 @@ window.__ModuleLoader__.load({
                   }),
                 ),
                 h('span', { className: 'dsh-cg-stats-text' }, t('global.indexed', { count: stats.indexed })),
+                /* Debug only: the numbers the next performance round has to move. */
+                debugEnabled()
+                  ? h('span', { className: 'dsh-cg-stats-text' }, `build ${stats.buildMs || 0}ms · match ${stats.matchMs || 0}ms · jump ${jumpTiming.lastMs}ms`)
+                  : null,
                 h('span', { className: 'dsh-cg-stats-text' }, t('global.scopeHint.' + scope)),
                 h('span', { className: 'dsh-cg-stats-text' }, filtersSummary(t, filters)),
                 status === 'loading' && !refreshing
