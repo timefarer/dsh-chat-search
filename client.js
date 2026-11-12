@@ -57,6 +57,9 @@ window.__ModuleLoader__.load({
         return {
           build: BUILD,
           pickedRuleLoaded,
+          /* Which marker path is live right now, so a lag report can be answered without guessing. */
+          nativeHighlight: typeof CSS !== 'undefined' && CSS !== null && Boolean(CSS.highlights),
+          overlayBoxes: highlightBoxes.length,
           rail: railElement === null ? null : {
             display: getComputedStyle(railElement).display,
             top: getComputedStyle(railElement).top,
@@ -66,6 +69,19 @@ window.__ModuleLoader__.load({
         }
       }
     }
+    /** Any deliberate scroll after a jump cancels the landing replays. */
+    function registerUserScrollWatch() {
+      if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return () => {}
+      const mark = () => {
+        userScrolledSinceJump = true
+      }
+      const events = ['wheel', 'touchmove', 'keydown']
+      for (const name of events) window.addEventListener(name, mark, { capture: true, passive: true })
+      return () => {
+        for (const name of events) window.removeEventListener(name, mark, true)
+      }
+    }
+
     /** Result and highlight budgets keep one search bounded on a very long log. */
     const MAX_RESULTS = 200
     const MAX_WORD_HITS = 60
@@ -389,6 +405,8 @@ window.__ModuleLoader__.load({
       '.dsh-cg-file{max-width:220px;padding:1px 6px;border:.5px solid var(--dsw-alias-border-l1);border-radius:999px;color:var(--dsw-alias-label-secondary);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
       '.dsh-cg-file[data-kind="in"]{border-style:dashed}',
       '.dsh-cg-state{padding:48px 12px;text-align:center;color:var(--dsw-alias-label-secondary);line-height:1.7}',
+      /* The loading row keeps the spinner and its label on one optical line. */
+      '.dsh-cg-state--row{display:flex;align-items:center;justify-content:center;gap:8px;line-height:1}',
       '.dsh-cg-state strong{display:block;margin-bottom:6px;color:var(--dsw-alias-label-primary);font-weight:600;font-size:var(--dsh-content-font-size,14px)}',
       '.dsh-cg-error-text{display:block;margin:4px 0 12px;color:var(--dsw-alias-state-error-primary);overflow-wrap:anywhere}',
     ].join('\n')
@@ -463,7 +481,7 @@ window.__ModuleLoader__.load({
       '.dsh-csearch-files{display:flex;flex-wrap:wrap;gap:4px}',
       '.dsh-csearch-file{max-width:100%;padding:1px 7px;border:.5px solid var(--dsw-alias-border-l1);border-radius:999px;color:var(--dsw-alias-label-secondary);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
       '::highlight(dsh-chat-search){background-color:rgba(255,199,0,.5);color:inherit}',
-      '.dsh-csearch-rail{position:fixed;width:3px;border-radius:2px;background:rgba(74,144,255,.7);box-shadow:0 0 6px rgba(74,144,255,.45);pointer-events:none;z-index:60;transition:top .08s linear,height .08s linear}',
+      '.dsh-csearch-rail{position:fixed;width:3px;border-radius:2px;background:rgba(74,144,255,.7);box-shadow:0 0 6px rgba(74,144,255,.45);pointer-events:none;z-index:60}',
       '.dsh-csearch-highlight-layer{position:fixed;inset:0;z-index:900;pointer-events:none;overflow:hidden}',
       '.dsh-csearch-highlight{position:absolute;border-radius:2px;background:rgba(255,199,0,.5)}',
       '.dsh-csearch-results{display:flex;flex-direction:column;gap:2px}',
@@ -1239,6 +1257,8 @@ window.__ModuleLoader__.load({
     let selectedRow = null
     /** Left-edge rail that shows where the landed paragraph sits in the conversation. */
     let railElement = null
+    /** Set as soon as the reader scrolls after a jump: the replays must stop moving the view. */
+    let userScrolledSinceJump = false
 
     /** Draw (or move) the left rail next to the landed paragraph. */
     function paintRail(row, range) {
@@ -1681,6 +1701,7 @@ window.__ModuleLoader__.load({
         return false
       }
       lastPaint = { key: nodeKey, ranges: scrollAndPaint(row, words, anchor), anchor }
+      userScrolledSinceJump = false
       replayLanding(nodeKey, words, anchor)
       return true
     }
@@ -1718,6 +1739,8 @@ window.__ModuleLoader__.load({
     function replayLanding(nodeKey, words, anchor) {
       for (const delay of [120, 400, 900, 1500]) {
         setTimeout(() => {
+          /* Once the reader scrolls, the jump is theirs: no more repaints and no re-centring. */
+          if (userScrolledSinceJump) return
           const rows = rowsOf(nodeKey)
           const row = rows[0]
           if (row === undefined) return
@@ -3299,7 +3322,7 @@ window.__ModuleLoader__.load({
       } else if (result === null) {
         body = h(
           'div',
-          { className: 'dsh-cg-state' },
+          { className: 'dsh-cg-state dsh-cg-state--row' },
           spinner(),
           h('span', null, t('global.loading')),
         )
@@ -3592,6 +3615,8 @@ window.__ModuleLoader__.load({
       ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'conversation-search: dictionaries')
       ctx.effect(() => insertStyles(), 'conversation-search: styles')
       ctx.effect(() => installProbe(), 'conversation-search: probe')
+      /* A reader scrolling right after a jump takes over: the landing replays stop moving the view. */
+      ctx.effect(() => registerUserScrollWatch(), 'conversation-search: scroll watch')
       ctx.effect(() => registerFindShortcut(ctx, t, () => openSearchTab(ctx, null)), 'conversation-search: find shortcut')
 
       ctx.effect(
