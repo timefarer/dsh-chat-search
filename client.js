@@ -195,6 +195,7 @@ window.__ModuleLoader__.load({
       'global.recent': '最近搜索',
       'global.firstIndex': '首次检索需要建立索引，可能稍慢',
       'command.find': '在对话中查找',
+      'command.global': '全局搜索（所有会话）',
       'filters.label': '筛选',
       'filters.since': '开始',
       'filters.until': '结束',
@@ -291,6 +292,7 @@ window.__ModuleLoader__.load({
       'global.recent': 'Recent',
       'global.firstIndex': 'The first search builds the index, so it may take a moment',
       'command.find': 'Find in conversation',
+      'command.global': 'Global search (all sessions)',
       'filters.label': 'Filter',
       'filters.since': 'From',
       'filters.until': 'To',
@@ -1853,52 +1855,90 @@ window.__ModuleLoader__.load({
     }
 
     /** Bind Ctrl/Cmd+F to the in-conversation search, preferring the app's shortcut registry. */
+    /** Switch the main area to the global page; the left rail entry stays the visible affordance. */
+    function openGlobalPanel(ctx) {
+      const layout = ctx.get('layout')
+      if (layout !== undefined && layout !== null && typeof layout.selectPanel === 'function') {
+        try {
+          layout.selectPanel(PANEL_ID)
+          return true
+        } catch (error) {
+          debugLog('global panel selection failed', { message: String(error && error.message) })
+        }
+      }
+      return false
+    }
+
     /**
-     * Bind Ctrl/Cmd+F to the in-conversation search.
+     * Bind the two search entries.
      *
      * The registry validates a command's defaults for every runtime before it stores anything, and
-     * the Web runtime only admits a short allow-list of combinations — `primary+KeyF` is not on it.
-     * Declaring a web default therefore refused the whole command, desktop included, and the app
-     * silently fell back to a DOM listener. So: register desktop defaults only, and let the page
-     * keep its own listener for the web, where no allowed default exists.
+     * the Web runtime only admits a short allow-list — `primary+KeyF` is not on it, so a web default
+     * refused the whole command (desktop included). Both commands therefore declare desktop keys
+     * only, and the page keeps its own listener for the Web.
+     *
+     *   Ctrl/Cmd+F        in-conversation panel
+     *   Ctrl/Cmd+Shift+F  global search page
      */
     function registerFindShortcut(ctx, t, open) {
       const shortcuts = ctx.get('shortcuts')
-      let disposeRegistry = null
+      const disposeList = []
       if (shortcuts !== undefined && shortcuts !== null && typeof shortcuts.register === 'function') {
-        try {
-          disposeRegistry = shortcuts.register({
+        const commands = [
+          {
             id: 'conversation-search.find',
             label: () => t('command.find'),
             aliases: ['search conversation', 'find in conversation'],
-            defaults: {
-              'desktop:macos': { code: 'KeyF', modifiers: ['primary'] },
-              'desktop:windows': { code: 'KeyF', modifiers: ['primary'] },
-              'desktop:linux': { code: 'KeyF', modifiers: ['primary'] },
-            },
-            regions: ['page', 'editable'],
-            modals: [],
-            resolve: () => ({ status: 'handled', run: open }),
-          })
-        } catch (error) {
-          debugLog('shortcut registry refused the binding', { message: String(error && error.message) })
+            run: open,
+          },
+          {
+            id: 'conversation-search.global',
+            label: () => t('command.global'),
+            aliases: ['search all sessions', 'global search'],
+            run: () => openGlobalPanel(ctx),
+          },
+        ]
+        for (const command of commands) {
+          try {
+            const dispose = shortcuts.register({
+              id: command.id,
+              label: command.label,
+              aliases: command.aliases,
+              defaults: {
+                'desktop:macos': { code: 'KeyF', modifiers: command.id.endsWith('.global') ? ['primary', 'shift'] : ['primary'] },
+                'desktop:windows': { code: 'KeyF', modifiers: command.id.endsWith('.global') ? ['primary', 'shift'] : ['primary'] },
+                'desktop:linux': { code: 'KeyF', modifiers: command.id.endsWith('.global') ? ['primary', 'shift'] : ['primary'] },
+              },
+              regions: ['page', 'editable'],
+              modals: [],
+              resolve: () => ({ status: 'handled', run: command.run }),
+            })
+            if (typeof dispose === 'function') disposeList.push(dispose)
+          } catch (error) {
+            debugLog('shortcut registry refused the binding', { id: command.id, message: String(error && error.message) })
+          }
         }
       }
-      /* Always keep the page listener: it is the only binding the Web runtime gets, and on desktop
-         it stays quiet because the registry handles the key first. */
-      const disposeDom = registerDomFindShortcut(open)
+      /* The page listener is the only binding the Web runtime gets, and on desktop it stays quiet
+         because the registry handles the key first (it marks the event prevented). */
+      disposeList.push(registerDomFindShortcut(open, () => openGlobalPanel(ctx)))
       return () => {
-        if (typeof disposeRegistry === 'function') disposeRegistry()
-        disposeDom()
+        for (const dispose of disposeList) {
+          try {
+            dispose()
+          } catch (error) {
+            debugLog('releasing a shortcut binding failed', { message: String(error && error.message) })
+          }
+        }
       }
     }
 
-    /** Page-level binding for Ctrl/Cmd+F; skipped when the shortcut registry already handled it. */
-    function registerDomFindShortcut(open) {
+    /** Page-level bindings for Ctrl/Cmd+F and Ctrl/Cmd+Shift+F; skipped when already handled. */
+    function registerDomFindShortcut(open, openGlobal) {
       if (typeof document === 'undefined' || typeof document.addEventListener !== 'function') return () => {}
       const handler = (event) => {
         if (event.defaultPrevented) return
-        if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return
+        if (!(event.ctrlKey || event.metaKey) || event.altKey) return
         if (typeof event.key !== 'string' || event.key.toLowerCase() !== 'f') return
         const target = event.target
         const inEditor =
@@ -1908,10 +1948,11 @@ window.__ModuleLoader__.load({
           target.closest('.cm-editor, .xterm, .xterm-helper-textarea') !== null
         if (inEditor) return
         event.preventDefault()
-        open()
+        if (event.shiftKey) openGlobal()
+        else open()
       }
       /* Bubble phase on purpose: a registry binding on document/window runs first and marks the
-         event handled, so the two never both open the panel. */
+         event handled, so the two never both act on one press. */
       document.addEventListener('keydown', handler, false)
       return () => document.removeEventListener('keydown', handler, false)
     }
@@ -2418,6 +2459,19 @@ window.__ModuleLoader__.load({
       const useChat = props.useChat
       const useSession = props.useSession
       const requestOlder = props.requestOlder
+      /* The seat hands every tab body `useTabInfo`; `closeTab` comes from this plugin's inject. */
+      const useTabInfo = props.useTabInfo
+      const closeTab = props.closeTab
+      const closeSelf = useCallback(() => {
+        try {
+          const info = typeof useTabInfo === 'function' ? useTabInfo() : null
+          const tab = info !== null && info !== undefined && info.tab !== null && info.tab !== undefined ? info.tab : null
+          const tabId = tab !== null && typeof tab.id === 'string' ? tab.id : ''
+          if (tabId !== '' && typeof closeTab === 'function') closeTab(tabId)
+        } catch (error) {
+          debugLog('closing the search tab failed', { message: String(error && error.message) })
+        }
+      }, [useTabInfo, closeTab])
 
       const order = useChat((snapshot) => snapshot.order)
       const nodeStore = useChat((snapshot) => snapshot.nodes)
@@ -2633,13 +2687,14 @@ window.__ModuleLoader__.load({
             if (moveRowFocus(bodyRef.current, 1)) event.preventDefault()
             return
           }
-          if (event.key === 'Escape' && query !== '') {
+          if (event.key === 'Escape') {
+            /* Esc closes the panel, like every other dismissible surface. */
+            event.preventDefault()
             event.stopPropagation()
-            setQuery('')
-            storeQuery(sessionId, '')
+            closeSelf()
           }
         },
-        [query, sessionId, jumpFirst],
+        [closeSelf, jumpFirst],
       )
 
       const onListKeyDown = useCallback((event) => {
@@ -2732,7 +2787,7 @@ window.__ModuleLoader__.load({
 
       return h(
         'div',
-        { className: 'dsh-csearch-root' },
+        { className: 'dsh-csearch-root', onKeyDown },
         h(
           'div',
           { className: 'dsh-csearch-head' },
@@ -3762,7 +3817,16 @@ window.__ModuleLoader__.load({
                       name: 'sidebar.right.pane.tab',
                       key: TAB_ID,
                       locale: NS,
-                      inject: (sessionId) => ({ requestOlder: () => loadOlderPage(ctx, sessionId) }),
+                      inject: (sessionId) => ({
+                        requestOlder: () => loadOlderPage(ctx, sessionId),
+                        /* Esc closes the tab itself: the seat's own close path, not a simulated click. */
+                        closeTab: (tabId) => {
+                          const sidebar = ctx.get('sidebarRight')
+                          if (sidebar !== undefined && sidebar !== null && typeof sidebar.closeIn === 'function') {
+                            sidebar.closeIn(sessionId, tabId)
+                          }
+                        },
+                      }),
                     },
                     SearchPanel,
                   ),

@@ -759,6 +759,45 @@ check('find shortcut resolves as handled', resolution !== null && resolution.sta
 if (resolution !== null && resolution.status === 'handled') resolution.run()
 check('find shortcut opens the search tab', openedTabs.includes('conversation-search'), JSON.stringify(openedTabs))
 
+/* The global page has its own binding: Ctrl/Cmd+Shift+F, also desktop-only for the same reason. */
+const globalDefinition = shortcutDefinitions.find((definition) => definition.id === 'conversation-search.global')
+check('global shortcut registered', globalDefinition !== undefined, JSON.stringify(shortcutDefinitions.map((d) => d.id)))
+check(
+  'global shortcut binds Ctrl/Cmd+Shift+F',
+  globalDefinition !== undefined &&
+    globalDefinition.defaults['desktop:windows'].code === 'KeyF' &&
+    globalDefinition.defaults['desktop:windows'].modifiers.includes('primary') &&
+    globalDefinition.defaults['desktop:windows'].modifiers.includes('shift'),
+  globalDefinition === undefined ? 'no definition' : JSON.stringify(globalDefinition.defaults['desktop:windows']),
+)
+check(
+  'global shortcut declares no web default',
+  globalDefinition !== undefined && Object.keys(globalDefinition.defaults).every((key) => !key.startsWith('web:')),
+  globalDefinition === undefined ? 'no definition' : JSON.stringify(Object.keys(globalDefinition.defaults)),
+)
+
+/* Escape closes the panel through the seat's own close path. */
+const closeCalls = []
+const closeProps = {
+  ...panelProps,
+  closeTab: (tabId) => closeCalls.push(tabId),
+  useTabInfo: () => ({ tab: { id: 'tab-under-test' } }),
+}
+let closeTree = await settle('panel-close', bodyRegistration.Component, closeProps)
+const closeRoot = findNode(closeTree, 'dsh-csearch-root')
+check('panel root rendered for the Escape test', closeRoot !== null)
+if (closeRoot !== null && typeof closeRoot.props.onKeyDown === 'function') {
+  let prevented = false
+  closeRoot.props.onKeyDown({
+    key: 'Escape',
+    preventDefault: () => {
+      prevented = true
+    },
+    stopPropagation: () => {},
+  })
+  check('Escape closes the panel', closeCalls.includes('tab-under-test') && prevented, JSON.stringify(closeCalls))
+}
+
 // #endregion
 
 // #region file rows and page memory ------------------------------------------
