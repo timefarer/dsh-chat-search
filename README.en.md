@@ -5,11 +5,12 @@
 
 [简体中文](README.md) | English
 
-**Conversation search for DeepSeek Harness (`dsh`)**: search the open conversation from a
-right-sidebar panel, or search every stored session from a full page in the main area. Results
-match **paragraphs** and **file names**, expand as a **session → question → paragraph** tree,
-can be narrowed by **date range** and **turn count**, and a click jumps to the exact paragraph
-with the matched words highlighted.
+**Global conversation search and filtering for DeepSeek Harness (`dsh`)**: search chat history
+across every session or just the open one, matching both **paragraph text** and **file names** —
+find it even when you only remember the file. Narrow results with **date range** and **each
+session's recent turns**; hits expand as a **session → question → paragraph** tree, and a click
+lands on the match with the words highlighted. Defaults to the last 14 days and the latest 30
+turns per session; leave either empty to search everything.
 
 > Status: 1.2.0, targets DSH ≥ 0.2.0-rc.1. Best effort — the plugin leans on a few undocumented
 > DOM anchors and client services, so a future DSH release may break it; fixes follow quickly.
