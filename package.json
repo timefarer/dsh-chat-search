@@ -1,7 +1,7 @@
 {
   "name": "dsh-chat-search",
   "version": "1.2.1",
-  "description": "DSH 全局会话搜索与筛选插件：在全部会话或当前会话中搜索聊天记录，正文段落与文件名都能命中；支持按日期范围与每会话最近轮次筛选、过滤，结果按「会话 → 问题 → 段落」展开，跳转后自动定位并高亮命中词。Global conversation search and filtering with paragraph and file-name matching.",
+  "description": "DSH 全局搜索与会话搜索插件：在所有会话或当前会话中搜索聊天记录，同时检索正文段落与文件名；支持按日期范围与每个会话的最近轮次过滤，结果按「会话 → 问题 → 段落」展开，跳转后自动定位并高亮命中词。Global and in-session search with paragraph and file-name matching.",
   "type": "module",
   "license": "MIT",
   "author": "Yu Hai",
@@ -70,7 +70,7 @@
     }
   },
   "meta": {
-    "title": "全局会话搜索、筛选与过滤",
-    "description": "在全部或当前会话中搜索聊天记录与文件名；按日期范围、每会话轮次筛选过滤；结果按会话 → 问题 → 段落展开，跳转定位并高亮命中词。"
+    "title": "全局搜索与会话搜索",
+    "description": "在全部或当前会话中搜索聊天记录，同时检索段落与文件名；按日期范围、每会话轮次过滤；结果三层展开，跳转定位并高亮命中词。"
   }
 }
