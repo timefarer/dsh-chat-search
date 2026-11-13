@@ -523,6 +523,34 @@ check(
   JSON.stringify(storedFilters.body.value.filters),
 )
 
+/* A window that was never customised follows today; a hand-picked range stays where it was put. */
+const yesterday = dayString(1)
+const rollingWindow = await post({
+  action: 'search',
+  query: '记录的',
+  scope: 'all',
+  filters: { since: dayString(14), until: dayString(1), turns: 0, rolling: true, savedOn: dayString(1) },
+})
+const rolledFilters = rollingWindow.body.value.filters
+check(
+  'a rolling window moves up to today',
+  rolledFilters.until === dayString(0) && rolledFilters.since === dayString(13),
+  JSON.stringify(rolledFilters),
+)
+const fixedWindow = await post({
+  action: 'search',
+  query: '记录的',
+  scope: 'all',
+  filters: { since: dayString(14), until: dayString(1), turns: 0, rolling: false, savedOn: '' },
+})
+const keptFilters = fixedWindow.body.value.filters
+check(
+  'a hand-picked window stays put',
+  keptFilters.until === dayString(1) && keptFilters.since === dayString(14),
+  JSON.stringify(keptFilters),
+)
+check('yesterday is before today', yesterday !== dayString(0), yesterday)
+
 /* A fresh plugin instance reads the saved window back. */
 const routes3 = []
 apply({

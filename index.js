@@ -317,11 +317,57 @@ function localDate(date) {
   return `${year}-${month}-${day}`
 }
 
-/** The default window: the last two weeks, the last thirty turns of each Session. */
+/**
+ * The default window: the last two weeks, the last thirty turns of each Session.
+ *
+ * `rolling` marks a window that was never customised: it follows "today" instead of freezing the
+ * day it was saved, so opening the plugin tomorrow still includes tomorrow's sessions.
+ */
 function defaultFilters() {
   const now = new Date()
   const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (DEFAULT_FILTER_DAYS - 1))
-  return { since: localDate(start), until: localDate(now), turns: DEFAULT_FILTER_TURNS }
+  return { since: localDate(start), until: localDate(now), turns: DEFAULT_FILTER_TURNS, rolling: true, savedOn: localDate(now) }
+}
+
+function parseDay(value) {
+  const parts = dateString(value).split('-').map(Number)
+  if (parts.length !== 3 || parts.some((part) => !Number.isFinite(part))) return null
+  const date = new Date(parts[0], parts[1] - 1, parts[2])
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+function daysBetween(from, to) {
+  const start = parseDay(from)
+  const end = parseDay(to)
+  if (start === null || end === null) return 0
+  return Math.round((end.getTime() - start.getTime()) / 86_400_000)
+}
+
+function shiftDay(value, days) {
+  const date = parseDay(value)
+  if (date === null) return value
+  return localDate(new Date(date.getFullYear(), date.getMonth(), date.getDate() + days))
+}
+
+/**
+ * Move an untouched default window up to today.
+ *
+ * Only windows still marked `rolling` move: a range the reader picked by hand stays exactly where
+ * it was put, which is what makes "last 14 days" usable without silently rewriting custom filters.
+ */
+function rollFilters(filters) {
+  if (filters.rolling !== true) return filters
+  const today = localDate(new Date())
+  if (filters.savedOn === '' || filters.savedOn >= today) return { ...filters, savedOn: filters.savedOn === '' ? today : filters.savedOn }
+  const delta = daysBetween(filters.savedOn, today)
+  if (delta <= 0) return { ...filters, savedOn: today }
+  return {
+    since: filters.since === '' ? '' : shiftDay(filters.since, delta),
+    until: filters.until === '' ? '' : shiftDay(filters.until, delta),
+    turns: filters.turns,
+    rolling: true,
+    savedOn: today,
+  }
 }
 
 function dateString(value) {
@@ -350,7 +396,18 @@ function normalizeFilters(input) {
     since = until
     until = swap
   }
-  return { since, until, turns: turnCount(input.turns) }
+  let rolling = input.rolling === true
+  let savedOn = dateString(input.savedOn)
+  /* Legacy file (pre-1.2.4): a default-shaped window that ends in the past was the rolling
+     default, so keep it following today instead of freezing on the day it was written. */
+  if (typeof input.rolling !== 'boolean' && savedOn === '') {
+    const span = since !== '' && until !== '' ? daysBetween(since, until) + 1 : 0
+    if (until !== '' && span === DEFAULT_FILTER_DAYS && until < localDate(new Date())) {
+      rolling = true
+      savedOn = until
+    }
+  }
+  return rollFilters({ since, until, turns: turnCount(input.turns), rolling, savedOn })
 }
 
 function dayStartMs(value) {

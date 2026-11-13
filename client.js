@@ -729,11 +729,43 @@ window.__ModuleLoader__.load({
       return `${year}-${month}-${day}`
     }
 
-    /** The default window: the last two weeks, the last thirty turns. */
+    /** The default window: the last two weeks, the last thirty turns, and it follows today. */
     function defaultFilters() {
       const now = new Date()
       const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 13)
-      return { since: localDateValue(start), until: localDateValue(now), turns: 30 }
+      return { since: localDateValue(start), until: localDateValue(now), turns: 30, rolling: true, savedOn: localDateValue(now) }
+    }
+
+    function filterDay(value) {
+      const parts = String(value).split('-').map(Number)
+      if (parts.length !== 3 || parts.some((part) => !Number.isFinite(part))) return null
+      const date = new Date(parts[0], parts[1] - 1, parts[2])
+      return Number.isNaN(date.getTime()) ? null : date
+    }
+
+    function filterShift(value, days) {
+      const date = filterDay(value)
+      if (date === null) return value
+      return localDateValue(new Date(date.getFullYear(), date.getMonth(), date.getDate() + days))
+    }
+
+    /** Move a window that is still the untouched default up to today; custom ranges never move. */
+    function rollFilters(filters) {
+      if (filters.rolling !== true) return filters
+      const today = localDateValue(new Date())
+      const savedOn = filters.savedOn === '' ? today : filters.savedOn
+      if (savedOn >= today) return { ...filters, savedOn: today }
+      const from = filterDay(savedOn)
+      const to = filterDay(today)
+      const delta = from === null || to === null ? 0 : Math.round((to.getTime() - from.getTime()) / 86_400_000)
+      if (delta <= 0) return { ...filters, savedOn: today }
+      return {
+        since: filters.since === '' ? '' : filterShift(filters.since, delta),
+        until: filters.until === '' ? '' : filterShift(filters.until, delta),
+        turns: filters.turns,
+        rolling: true,
+        savedOn: today,
+      }
     }
 
     /** Clamp one filter value; missing means "defaults", an explicit object means exactly itself. */
@@ -748,7 +780,19 @@ window.__ModuleLoader__.load({
       }
       const raw = typeof input.turns === 'number' ? input.turns : Number(input.turns)
       const turns = Number.isFinite(raw) && raw > 0 ? Math.min(Math.floor(raw), 5000) : 0
-      return { since, until, turns }
+      let rolling = input.rolling === true
+      let savedOn = typeof input.savedOn === 'string' ? input.savedOn : ''
+      /* Legacy host record: a default-shaped window ending in the past was the rolling default. */
+      if (typeof input.rolling !== 'boolean' && savedOn === '') {
+        const from = since === '' ? null : filterDay(since)
+        const to = until === '' ? null : filterDay(until)
+        const span = from === null || to === null ? 0 : Math.round((to.getTime() - from.getTime()) / 86_400_000) + 1
+        if (until !== '' && span === 14 && until < localDateValue(new Date())) {
+          rolling = true
+          savedOn = until
+        }
+      }
+      return rollFilters({ since, until, turns, rolling, savedOn })
     }
 
     function dayStart(value) {
@@ -2340,7 +2384,9 @@ window.__ModuleLoader__.load({
      * Empty dates and a zero turn count mean "no bound"; the reset button restores the defaults.
      */
     function filterFields(t, value, onChange) {
-      const update = (patch) => onChange({ ...value, ...patch })
+      /* Any hand edit turns the window from "last 14 days" into a fixed range: it stops following
+         today, which is what the reader asked for by typing dates. */
+      const update = (patch) => onChange({ ...value, ...patch, rolling: false, savedOn: '' })
       return h(
         'div',
         { className: 'dsh-filter-body' },
