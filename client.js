@@ -21,7 +21,7 @@ window.__ModuleLoader__.load({
     /** How much of a paragraph's text identifies it, matching the Host's ANCHOR_CHARS. */
     const PARAGRAPH_ANCHOR_CHARS = 80
     /** Shown in the UI so a stale client module is visible at a glance; test/build asserts it. */
-    const BUILD = 'v1.2.3'
+    const BUILD = 'v1.2.4'
 
     /** Diagnostics are off unless the reader opts in from DevTools. */
     function debugEnabled() {
