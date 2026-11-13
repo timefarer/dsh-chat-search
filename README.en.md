@@ -12,7 +12,7 @@ session's recent turns**; hits expand as a **session → question → paragraph*
 lands on the match with the words highlighted. Defaults to the last 14 days and the latest 30
 turns per session; leave either empty to search everything.
 
-> Status: 1.2.0, targets DSH ≥ 0.2.0-rc.1. Best effort — the plugin leans on a few undocumented
+> Status: 1.2.1, targets DSH ≥ 0.2.0-rc.1. Best effort — the plugin leans on a few undocumented
 > DOM anchors and client services, so a future DSH release may break it; fixes follow quickly.
 
 ## Screenshots
