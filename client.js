@@ -1701,10 +1701,11 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * Mark one row: the landed paragraph first (blue), then the matched words (amber).
+     * Mark one row: the landed paragraph keeps its left blue rail (paintSelection), then the
+     * matched words are highlighted in amber.
      *
      * Registration order is the paint order of Custom Highlights, so the amber words stay
-     * readable on top of the blue paragraph wash instead of being tinted by it.
+     * readable instead of being tinted by an earlier layer.
      */
     function paintHighlight(row, words, scroller, anchor) {
       paintSelection(row, anchor)
