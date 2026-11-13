@@ -186,8 +186,11 @@ add(assistantNode('n6', 3, [{ kind: 'text', text: '远古标记的回复内容�
 
 const chatSnapshot = { order, nodes }
 const sessionSnapshot = { running: false, hasMore: false, loadingOlder: false }
+/* Same Session, but with older history still unloaded: typing must not page it in. */
+const sessionSnapshotOlder = { running: false, hasMore: true, loadingOlder: false }
 const useChat = (selector) => selector(chatSnapshot)
 const useSession = (selector) => selector(sessionSnapshot)
+const useSessionOlder = (selector) => selector(sessionSnapshotOlder)
 
 // #endregion
 
@@ -583,6 +586,24 @@ check(
   offsetText.includes('第 4 段'),
   offsetText.slice(0, 300),
 )
+
+/* Typing must not page history in: the conversation scrollport has to stay where the reader left it. */
+let olderRequests = 0
+const panelPropsOlder = {
+  ...panelProps,
+  useSession: useSessionOlder,
+  requestOlder: () => {
+    olderRequests += 1
+    return true
+  },
+}
+let olderTree = await settle('panel-older', bodyRegistration.Component, panelPropsOlder)
+const olderInput = findNode(olderTree, 'dsh-csearch-input')
+if (olderInput !== null) olderInput.props.onChange({ target: { value: '侧边栏 宽度' } })
+olderTree = await settle('panel-older', bodyRegistration.Component, panelPropsOlder)
+const olderText = flatten(olderTree).join('|')
+check('typing does not page older history', olderRequests === 0, `requestOlder calls: ${olderRequests}`)
+check('banner explains the truncated window', olderText.includes('更早的历史尚未加载'), olderText.slice(0, 300))
 
 // #endregion
 

@@ -21,7 +21,7 @@ window.__ModuleLoader__.load({
     /** How much of a paragraph's text identifies it, matching the Host's ANCHOR_CHARS. */
     const PARAGRAPH_ANCHOR_CHARS = 80
     /** Shown in the UI so a stale client module is visible at a glance; test/build asserts it. */
-    const BUILD = 'v1.2.4'
+    const BUILD = 'v1.2.5'
 
     /** Diagnostics are off unless the reader opts in from DevTools. */
     function debugEnabled() {
@@ -61,6 +61,16 @@ window.__ModuleLoader__.load({
           nativeHighlight: typeof CSS !== 'undefined' && CSS !== null && Boolean(CSS.highlights),
           overlayBoxes: highlightBoxes.length,
           jumpMs: jumpTiming.lastMs,
+          /* The last landing, so "clicked but nothing moved" can be answered with numbers. */
+          jump: jumpTiming.last,
+          reasserts: jumpTiming.reasserts,
+          followingTail: (() => {
+            try {
+              return document.querySelector('[data-chat-following-tail]') !== null
+            } catch (error) {
+              return null
+            }
+          })(),
           rail: railElement === null ? null : {
             display: getComputedStyle(railElement).display,
             top: getComputedStyle(railElement).top,
@@ -127,6 +137,7 @@ window.__ModuleLoader__.load({
       'summary': '{turns} 组 · {matches} 条结果',
       'truncated': '结果较多，仅显示前 {count} 条',
       'history.missing': '更早的历史尚未加载，检索可能不完整',
+      'history.target': '正在加载到该段落 · 第 {pages} 页',
       'history.load': '加载全部',
       'history.loading': '加载中…',
       'history.failed': '无法自动加载更早的历史',
@@ -224,6 +235,7 @@ window.__ModuleLoader__.load({
       'summary': '{turns} groups · {matches} matches',
       'truncated': 'Showing the first {count} matches',
       'history.missing': 'Older history is not loaded, so results may be incomplete',
+      'history.target': 'Loading up to that paragraph · page {pages}',
       'history.load': 'Load all',
       'history.loading': 'Loading…',
       'history.failed': 'Could not load older history',
@@ -614,7 +626,7 @@ window.__ModuleLoader__.load({
     /** Jumps waiting for their Session to finish loading, keyed by Session id. */
     const pendingJumps = new Map()
     /** Click-to-landing clock: `requestedAt` when a jump starts, `lastMs` once it lands. */
-    const jumpTiming = { requestedAt: 0, lastMs: 0 }
+    const jumpTiming = { requestedAt: 0, lastMs: 0, last: null, reasserts: 0 }
     /** Readers currently showing a Session that may be asked to jump next. */
     const jumpListeners = new Set()
 
@@ -1259,10 +1271,61 @@ window.__ModuleLoader__.load({
     function centerInScroller(scroller, top, height) {
       const box = scroller.getBoundingClientRect()
       const target = scroller.scrollTop + (top - box.top) - Math.max(0, (scroller.clientHeight - height) / 2)
+      const distance = Math.abs(target - scroller.scrollTop)
+      /* A long jump must arrive: a smooth animation over thousands of pixels takes a second, and
+         anything that re-lays-out in that window cancels it. Only short hops stay animated. */
       scroller.scrollTo({
         top: Math.max(0, target),
-        behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+        behavior: !prefersReducedMotion() && distance < scroller.clientHeight * 2 ? 'smooth' : 'auto',
       })
+      return Math.max(0, target)
+    }
+
+    /**
+     * Every element between the row and the page that could carry the scroll.
+     *
+     * The host nests two scrollports (conversation root + `[data-conversation-scroll]`), and which
+     * one actually moves depends on the layout mode; guessing one is how a jump silently does
+     * nothing, so the caller may walk this list until one accepts the offset.
+     */
+    function scrollCandidates(row) {
+      const found = []
+      try {
+        const host = row.closest('[data-conversation-scroll]')
+        if (host !== null && host !== undefined) found.push(host)
+      } catch (error) {
+        /* Detached row. */
+      }
+      const nearest = conversationScrollerOf(row)
+      if (nearest !== null) found.push(nearest)
+      let node = row.parentElement
+      while (node !== null && node !== document.body && node !== document.documentElement) {
+        try {
+          const overflow = getComputedStyle(node).overflowY
+          if ((overflow === 'auto' || overflow === 'scroll') && node.scrollHeight > node.clientHeight + 2 && found.indexOf(node) < 0) {
+            found.push(node)
+          }
+        } catch (error) {
+          /* Ignore ancestors that refuse to be measured. */
+        }
+        node = node.parentElement
+      }
+      return found
+    }
+
+    /** Apply one offset to the first scrollport that can take it, and report which one it was. */
+    function scrollByAny(candidates, delta) {
+      for (const element of candidates) {
+        try {
+          const before = element.scrollTop
+          element.scrollTop = Math.max(0, before + delta)
+          if (Math.abs(element.scrollTop - before) > 0.5) return element
+          element.scrollTop = before
+        } catch (error) {
+          /* Try the next candidate. */
+        }
+      }
+      return null
     }
 
     /** The matched-word ranges inside one rendered row. */
@@ -1719,9 +1782,54 @@ window.__ModuleLoader__.load({
       return ranges
     }
 
+    /** Whether the host currently pins the conversation to the tail (new content keeps it at the bottom). */
+    function hasFollowingTail() {
+      try {
+        return document.querySelector('[data-chat-following-tail]') !== null
+      } catch (error) {
+        return null
+      }
+    }
+
+    /** A short label for logs: tag plus the first class. */
+    function elementLabel(element) {
+      try {
+        const raw = element.className && element.className.baseVal !== undefined ? element.className.baseVal : element.className
+        const first = String(raw || '').trim().split(/\s+/)[0] || ''
+        return element.tagName.toLowerCase() + (first === '' ? '' : '.' + first)
+      } catch (error) {
+        return 'unknown'
+      }
+    }
+
+    /**
+     * Release the host's tail follow before a jump.
+     *
+     * The host pauses follow on reader input; a click inside this panel is reader input, but it
+     * never reaches the conversation's own pointer handler. Re-sending the same pointerdown on the
+     * scrollport is the cheapest way to hand the scroll back to us, and it is what makes the first
+     * click after a reply finishes land instead of being pulled back to the bottom.
+     */
+    function pauseTailFollow(scroller) {
+      if (scroller === null || hasFollowingTail() !== true) return false
+      try {
+        if (typeof window.PointerEvent === 'function') {
+          scroller.dispatchEvent(
+            new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerId: 1, pointerType: 'mouse', isPrimary: true }),
+          )
+          return true
+        }
+      } catch (error) {
+        /* A host that rejects synthetic pointers simply keeps following. */
+      }
+      return false
+    }
+
     /** Scroll and mark one row at its CURRENT position. */
     function scrollAndPaint(row, words, anchor) {
       const scroller = conversationScrollerOf(row)
+      const before = scroller === null ? null : scroller.scrollTop
+      const released = pauseTailFollow(scroller)
       const ranges = paintHighlight(row, words, scroller, anchor)
       /* Centre on the paragraph itself, not on the first keyword: a target that is already on
          screen must still move to the middle, which is what "jump" means to a reader. */
@@ -1733,13 +1841,65 @@ window.__ModuleLoader__.load({
           : ranges.length > 0
             ? ranges[0].getBoundingClientRect()
             : row.getBoundingClientRect()
+        const box = scroller.getBoundingClientRect()
+        const delta = (rect.top - box.top) - Math.max(0, (scroller.clientHeight - rect.height) / 2)
+        const beforeTop = scroller.scrollTop
         centerInScroller(scroller, rect.top, rect.height)
+        /* A clamped or non-scrolling port takes nothing; hand the same offset to the next one.
+           Long offsets are written instantly, so scrollTop has already moved when we check. */
+        if (Math.abs(delta) > scroller.clientHeight && Math.abs(scroller.scrollTop - beforeTop) < 0.5) {
+          const used = scrollByAny(scrollCandidates(row), delta)
+          if (used !== null && jumpTiming.last !== null) jumpTiming.last.used = elementLabel(used)
+        }
       } else if (focus !== null && focus.height > 0 && typeof row.scrollIntoView === 'function') {
         row.scrollIntoView({ block: 'center', behavior: prefersReducedMotion() ? 'auto' : 'smooth' })
       } else if (typeof row.scrollIntoView === 'function') {
         row.scrollIntoView({ block: 'center', behavior: prefersReducedMotion() ? 'auto' : 'smooth' })
       }
+      jumpTiming.last = {
+        key: row.getAttribute('data-chat-node-key') || '',
+        scroller: scroller === null ? 'none' : elementLabel(scroller),
+        before,
+        after: scroller === null ? null : scroller.scrollTop,
+        following: hasFollowingTail(),
+        released,
+      }
       return ranges
+    }
+
+    /**
+     * Put the paragraph back in the middle when something else moved the scrollport after the jump.
+     *
+     * The host's tail follow, a fold opening, or a late resize can undo the smooth scroll; this pass
+     * re-measures and writes the offset instantly, and only when the target is clearly off-centre.
+     */
+    function reassertLanding(row, anchor, delay) {
+      if (row === undefined || row === null) return false
+      const scroller = conversationScrollerOf(row)
+      const range = typeof anchor === 'string' && anchor !== '' ? paragraphRange(row, anchor) : null
+      const rect = range !== null ? range.getBoundingClientRect() : row.getBoundingClientRect()
+      if (scroller === null || rect === null || rect.height < 1) return false
+      const box = scroller.getBoundingClientRect()
+      const delta = (rect.top - box.top) - (scroller.clientHeight - rect.height) / 2
+      if (Math.abs(delta) <= Math.max(24, scroller.clientHeight * 0.15)) return false
+      let used = null
+      try {
+        const before = scroller.scrollTop
+        scroller.scrollTop = Math.max(0, before + delta)
+        if (Math.abs(scroller.scrollTop - before) > 0.5) used = scroller
+        else scroller.scrollTop = before
+      } catch (error) {
+        /* Fall through to the other scrollports. */
+      }
+      if (used === null) used = scrollByAny(scrollCandidates(row), delta)
+      if (used === null) return false
+      jumpTiming.reasserts += 1
+      if (jumpTiming.last !== null) {
+        jumpTiming.last.reassertedAt = delay
+        jumpTiming.last.used = elementLabel(used)
+      }
+      debugLog('jump: reassert', { delay, delta: Math.round(delta), used: elementLabel(used) })
+      return true
     }
 
     /** Scroll the conversation to one message, mark the paragraph and the matched words. */
@@ -1757,6 +1917,17 @@ window.__ModuleLoader__.load({
       debugLog('jump: landed', { jumpMs: jumpTiming.lastMs })
       userScrolledSinceJump = false
       replayLanding(nodeKey, words, anchor)
+      /* Late reflow (tail follow, a fold opening, a resize) can undo the smooth scroll; verify the
+         landing a few times and correct it instantly while the reader has not taken over.
+         The first search after a restart also races the host's saved-position restore, which lands
+         after history loads: keep checking for three seconds so that restore cannot win. */
+      for (const delay of [260, 600, 1000, 1500, 2200, 3000]) {
+        setTimeout(() => {
+          if (userScrolledSinceJump) return
+          const again = rowsOf(nodeKey)[0]
+          if (again !== undefined) reassertLanding(again, anchor, delay)
+        }, delay)
+      }
       return true
     }
 
@@ -2535,10 +2706,13 @@ window.__ModuleLoader__.load({
       const [results, setResults] = useState(EMPTY_RESULTS)
       const [error, setError] = useState('')
       const [autoLoad, setAutoLoad] = useState(false)
+      /* The result row waiting for older history; '' when nothing is being loaded. */
+      const [loadingTarget, setLoadingTarget] = useState('')
       const inputRef = useRef(null)
       const bodyRef = useRef(null)
       const pagesRequested = useRef(0)
-      const autoStarted = useRef(false)
+      /* A pick whose row is not loaded yet: paged in on demand, never while typing. */
+      const pendingPick = useRef(null)
       /* True while the query came from a global jump rather than from typing. */
       const mirrored = useRef(false)
 
@@ -2651,18 +2825,11 @@ window.__ModuleLoader__.load({
         return () => clearTimeout(timer)
       }, [query, order, nodeStore, running, filters, scope])
 
-      /* Searching a truncated window is a trap: page the rest in as soon as a query exists.
-         A mirrored search deliberately skips this: the jump already loaded what it needed. */
-      useEffect(() => {
-        if (mirrored.current) return
-        if (query.trim() === '' || !hasMore || autoLoad || loadingOlder) return
-        if (autoStarted.current) return
-        autoStarted.current = true
-        pagesRequested.current = 0
-        setAutoLoad(true)
-      }, [query, hasMore, autoLoad, loadingOlder])
+      /* Typing never pages history: the conversation scrollport must stay where the reader left it.
+         Only a pick whose row is outside the loaded window loads older pages (see onPick + the
+         pending-pick effect below). The banner still offers a manual "load all". */
 
-      /* Page in the rest of the log one slice at a time until nothing older is left. */
+      /* Page in the rest of the log one slice at a time until nothing older is left (manual). */
       useEffect(() => {
         if (!autoLoad) return undefined
         if (!hasMore) {
@@ -2705,15 +2872,63 @@ window.__ModuleLoader__.load({
 
       const onPick = useCallback(
         (item, words) => {
-          if (!jumpToNode(item.key, words, item.anchor)) {
+          if (jumpToNode(item.key, words, item.anchor)) {
+            pendingPick.current = null
+            setLoadingTarget('')
+            setError('')
+            setPickedAnchor(item.kind === 'file' ? '' : item.anchor)
+            return
+          }
+          if (!hasMore) {
             setError(t('jump.missing'))
             return
           }
+          /* The row is outside the loaded window: page older history in until it appears.
+             This is the only path that loads history now — typing never scrolls the conversation. */
+          pagesRequested.current = 0
+          pendingPick.current = { item, words, tries: 0 }
+          setLoadingTarget(item.key)
           setError('')
-          setPickedAnchor(item.kind === 'file' ? '' : item.anchor)
         },
-        [t],
+        [hasMore, t],
       )
+
+      /* Drive a pending pick: try the landing, and page one older slice per turn until the row
+         exists. The reader sees progress instead of a conversation that scrolls by itself. */
+      useEffect(() => {
+        const pending = pendingPick.current
+        if (pending === null) return undefined
+        if (jumpToNode(pending.item.key, pending.words, pending.item.anchor)) {
+          pendingPick.current = null
+          setLoadingTarget('')
+          setError('')
+          setPickedAnchor(pending.item.kind === 'file' ? '' : pending.item.anchor)
+          return undefined
+        }
+        if (!hasMore) {
+          pendingPick.current = null
+          setLoadingTarget('')
+          setError(t('jump.missing'))
+          return undefined
+        }
+        if (loadingOlder) return undefined
+        const timer = setTimeout(() => {
+          if (pagesRequested.current >= MAX_PAGE_REQUESTS) {
+            pendingPick.current = null
+            setLoadingTarget('')
+            setError(t('history.failed'))
+            return
+          }
+          pagesRequested.current += 1
+          pending.tries += 1
+          if (!requestOlder()) {
+            pendingPick.current = null
+            setLoadingTarget('')
+            setError(t('history.failed'))
+          }
+        }, LOAD_PAGE_DELAY_MS)
+        return () => clearTimeout(timer)
+      }, [order, nodeStore, hasMore, loadingOlder, requestOlder, t])
 
       const words = useMemo(() => normalizeWords(query), [query])
 
@@ -2882,27 +3097,40 @@ window.__ModuleLoader__.load({
             ? h(
                 'div',
                 { className: 'dsh-csearch-banner' },
-                h('span', null, t('history.missing')),
                 h(
-                  'button',
-                  {
-                    type: 'button',
-                    disabled: autoLoad || loadingOlder,
-                    onClick: () => {
-                      pagesRequested.current = 0
-                      setError('')
-                      setAutoLoad(true)
-                    },
-                  },
-                  autoLoad || loadingOlder
-                    ? h(
-                        'span',
-                        { className: 'dsh-csearch-loading' },
-                        h('span', { className: 'dsh-cg-spinner dsh-cg-spinner-sm', 'aria-hidden': 'true' }),
-                        t('history.loading'),
-                      )
-                    : t('history.load'),
+                  'span',
+                  null,
+                  loadingTarget === ''
+                    ? t('history.missing')
+                    : t('history.target', { pages: pagesRequested.current }),
                 ),
+                loadingTarget !== ''
+                  ? h(
+                      'span',
+                      { className: 'dsh-csearch-loading' },
+                      h('span', { className: 'dsh-cg-spinner dsh-cg-spinner-sm', 'aria-hidden': 'true' }),
+                      t('history.loading'),
+                    )
+                  : h(
+                      'button',
+                      {
+                        type: 'button',
+                        disabled: autoLoad || loadingOlder,
+                        onClick: () => {
+                          pagesRequested.current = 0
+                          setError('')
+                          setAutoLoad(true)
+                        },
+                      },
+                      autoLoad || loadingOlder
+                        ? h(
+                            'span',
+                            { className: 'dsh-csearch-loading' },
+                            h('span', { className: 'dsh-cg-spinner dsh-cg-spinner-sm', 'aria-hidden': 'true' }),
+                            t('history.loading'),
+                          )
+                        : t('history.load'),
+                    ),
               )
             : null,
           error === '' ? null : h('div', { className: 'dsh-csearch-error' }, error),
