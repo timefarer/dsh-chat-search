@@ -562,6 +562,11 @@ check(
   Array.isArray(guide) && guide.length === 1 && typeof guide[0].title() === 'string' && typeof guide[0].description() === 'string',
   Array.isArray(guide) && guide.length === 1 ? JSON.stringify([guide[0].title(), guide[0].description()]) : 'no guide',
 )
+check(
+  'guide capsule carries the search glyph',
+  Array.isArray(guide) && guide.length === 1 && typeof guide[0].icon === 'function',
+  Array.isArray(guide) && guide.length === 1 ? typeof guide[0].icon : 'no guide',
+)
 check('body registered under the type id', byName('sidebar.right.pane.tab').length === 1)
 
 // #region in-conversation panel -----------------------------------------------

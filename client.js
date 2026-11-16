@@ -125,8 +125,8 @@ window.__ModuleLoader__.load({
 
     const zh = {
       'meta.title': '对话检索',
-      'tab.title': '对话检索',
-      'tab.guideDesc': '在当前会话里搜聊天记录、段落与文件名',
+      'tab.title': '会话搜索',
+      'tab.guideDesc': '在当前会话里搜索聊天记录、段落与文件名',
       'action.open': '检索当前对话',
       'placeholder': '输入关键词，检索本对话全部消息',
       'hint.title': '检索当前对话',
@@ -225,7 +225,7 @@ window.__ModuleLoader__.load({
 
     const en = {
       'meta.title': 'Conversation search',
-      'tab.title': 'Search',
+      'tab.title': 'Session search',
       'tab.guideDesc': 'Search this conversation by paragraph or file name',
       'action.open': 'Search this conversation',
       'placeholder': 'Type keywords to search every message',
@@ -2602,6 +2602,29 @@ window.__ModuleLoader__.load({
       )
     }
 
+    /**
+     * The guide capsule's glyph: the same magnifier as the left-rail entry, but sized by the host.
+     *
+     * Guide entries take `ComponentType<IconProps>`, so the component must accept the host's props
+     * instead of hard-coding a size (the header icon can keep its CSS-driven size).
+     */
+    function GuideSearchIcon(props) {
+      const size = props !== null && props !== undefined && typeof props.size === 'number' ? props.size : 16
+      return h(
+        'svg',
+        {
+          viewBox: '0 0 16 16',
+          width: size,
+          height: size,
+          fill: 'none',
+          'aria-hidden': 'true',
+          className: props !== null && props !== undefined ? props.className : undefined,
+        },
+        h('circle', { cx: '7', cy: '7', r: '4.4', stroke: 'currentColor', strokeWidth: 1.5 }),
+        h('path', { d: 'M10.4 10.4 14 14', stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round' }),
+      )
+    }
+
     function IconClose() {
       return h(
         'svg',
@@ -4179,6 +4202,7 @@ window.__ModuleLoader__.load({
                       order: 30,
                       title: () => t('tab.title'),
                       description: () => t('tab.guideDesc'),
+                      icon: GuideSearchIcon,
                     },
                   ],
                 }),
