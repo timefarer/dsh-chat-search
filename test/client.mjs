@@ -213,7 +213,7 @@ const zh = {
   'truncated': '仅显示前 {count} 条',
   'history.missing': '更早的历史尚未加载',
   'history.target': '正在加载到该段落 · 第 {pages} 页',
-  'shortcut.conflict': '快捷键 {keys} 与其它命令冲突（{ids}），可在 设置 → 快捷键 里改键',
+  'shortcut.conflict': '快捷键 {keys} 已被其它命令占用（{ids}），可能不会触发',
   'history.load': '加载全部',
   'history.loading': '加载中…',
   'history.failed': '无法加载',
@@ -580,7 +580,7 @@ check('assistant role label', panelText.includes('回复'))
 check('user role label', panelText.includes('提问'))
 check('unrelated paragraph excluded', !panelText.includes('这一段落与搜索词无关'))
 /* The registry reported another owner for Ctrl+Alt+Q: the panel must say so instead of looking broken. */
-check('shortcut conflict is surfaced in the panel', panelText.includes('与其它命令冲突'), panelText.slice(0, 260))
+check('shortcut conflict is surfaced in the panel', panelText.includes('已被其它命令占用'), panelText.slice(0, 260))
 
 /* The second reply message of Turn 1: paragraph numbers continue across messages, and the file
    row of the first message must not consume a number (the Host numbers paragraphs the same way). */
@@ -808,47 +808,27 @@ check(
   globalDefinition === undefined ? 'no definition' : JSON.stringify(Object.keys(globalDefinition.defaults)),
 )
 
-/* Escape closes the panel through the seat's own close path. */
-const closeCalls = []
-const closeProps = {
+/* Escape is intentionally not ours: the right-sidebar host closes every tab with Ctrl+W and owns
+   that tooltip, so the panel must not intercept the key. */
+const escCalls = []
+const escProps = {
   ...panelProps,
-  closeTab: (tabId) => closeCalls.push(tabId),
-  useTabInfo: () => ({ tab: { id: 'tab-under-test' } }),
+  closeTab: () => escCalls.push('fallback'),
+  useTabInfo: () => ({ tab: { id: 'tab-under-test', actions: { close: () => escCalls.push('seat') } } }),
 }
-let closeTree = await settle('panel-close', bodyRegistration.Component, closeProps)
-const closeRoot = findNode(closeTree, 'dsh-csearch-root')
-check('panel root rendered for the Escape test', closeRoot !== null)
-if (closeRoot !== null && typeof closeRoot.props.onKeyDown === 'function') {
+const escTree = await settle('panel-escape', bodyRegistration.Component, escProps)
+const escRoot = findNode(escTree, 'dsh-csearch-root')
+if (escRoot !== null && typeof escRoot.props.onKeyDown === 'function') {
   let prevented = false
-  closeRoot.props.onKeyDown({
+  escRoot.props.onKeyDown({
     key: 'Escape',
     preventDefault: () => {
       prevented = true
     },
     stopPropagation: () => {},
   })
-  check('Escape closes the panel', closeCalls.includes('tab-under-test') && prevented, JSON.stringify(closeCalls))
+  check('Escape is left to the host', escCalls.length === 0 && !prevented, JSON.stringify(escCalls))
 }
-
-/* The seat's own close action wins when it exists: it knows the live tab id, the injected fallback
-   only knows the registered kind id. */
-const actionCalls = []
-const actionProps = {
-  ...panelProps,
-  closeTab: () => actionCalls.push('fallback'),
-  /* The live seat exposes the close action as `tab.actions` (see SidebarRightTabInfo). */
-  useTabInfo: () => ({ tab: { id: 'tab-under-test', actions: { close: () => actionCalls.push('seat') } } }),
-}
-const actionTree = await settle('panel-close-action', bodyRegistration.Component, actionProps)
-const actionRoot = findNode(actionTree, 'dsh-csearch-root')
-if (actionRoot !== null && typeof actionRoot.props.onKeyDown === 'function') {
-  actionRoot.props.onKeyDown({
-    key: 'Escape',
-    preventDefault: () => {},
-    stopPropagation: () => {},
-  })
-}
-check('Escape prefers the seat close action', JSON.stringify(actionCalls) === '["seat"]', JSON.stringify(actionCalls))
 
 // #endregion
 

@@ -140,7 +140,7 @@ window.__ModuleLoader__.load({
       'summary': '{turns} 组 · {matches} 条结果',
       'truncated': '结果较多，仅显示前 {count} 条',
       'history.missing': '更早的历史尚未加载，检索可能不完整',
-      'shortcut.conflict': '快捷键 {keys} 与其它命令冲突（{ids}），可在 设置 → 快捷键 里改键',
+      'shortcut.conflict': '快捷键 {keys} 已被其它命令占用（{ids}），可能不会触发',
       'history.target': '正在加载到该段落 · 第 {pages} 页',
       'history.load': '加载全部',
       'history.loading': '加载中…',
@@ -239,7 +239,7 @@ window.__ModuleLoader__.load({
       'summary': '{turns} groups · {matches} matches',
       'truncated': 'Showing the first {count} matches',
       'history.missing': 'Older history is not loaded, so results may be incomplete',
-      'shortcut.conflict': 'Shortcut {keys} is already used by {ids}; rebind it in Settings → Shortcuts',
+      'shortcut.conflict': 'Shortcut {keys} is already taken by {ids}; it may not fire',
       'history.target': 'Loading up to that paragraph · page {pages}',
       'history.load': 'Load all',
       'history.loading': 'Loading…',
@@ -2773,61 +2773,6 @@ window.__ModuleLoader__.load({
       const useChat = props.useChat
       const useSession = props.useSession
       const requestOlder = props.requestOlder
-      /* The seat hands every tab body `useTabInfo`; `closeTab` comes from this plugin's inject. */
-      const useTabInfo = props.useTabInfo
-      const closeTab = props.closeTab
-      const closeSelf = useCallback(() => {
-        try {
-          const info = typeof useTabInfo === 'function' ? useTabInfo() : null
-          const tab = info !== null && info !== undefined && info.tab !== null && info.tab !== undefined ? info.tab : null
-          /* The seat hands the tab its own close action (`tab.actions.close`), and that is the only
-             path guaranteed to know the live tab id: the registered kind id and the tab id differ. */
-          const actions =
-            tab === null
-              ? null
-              : tab.actions !== undefined && tab.actions !== null
-                ? tab.actions
-                : tab.tabActions !== undefined && tab.tabActions !== null
-                  ? tab.tabActions
-                  : null
-          if (actions !== null && typeof actions.close === 'function') {
-            actions.close()
-            return
-          }
-          const tabId = tab !== null && typeof tab.id === 'string' ? tab.id : ''
-          if (tabId !== '' && typeof closeTab === 'function') closeTab(tabId)
-        } catch (error) {
-          debugLog('closing the search tab failed', { message: String(error && error.message) })
-        }
-      }, [useTabInfo, closeTab])
-
-      const rootRef = useRef(null)
-      const closingRef = useRef(false)
-
-      /* Esc closes the tab even when focus sits on a result row or the tab header. The document
-         capture listener only acts while this panel owns the focus, so host dialogs keep their Esc. */
-      useEffect(() => {
-        if (typeof document === 'undefined' || typeof document.addEventListener !== 'function') return undefined
-        const onEscape = (event) => {
-          if (event.key !== 'Escape' || closingRef.current) return
-          const root = rootRef.current
-          const active = document.activeElement
-          const inside =
-            root !== null &&
-            root !== undefined &&
-            (root.contains(event.target) || (active !== null && active !== undefined && root.contains(active)))
-          if (!inside) return
-          closingRef.current = true
-          event.preventDefault()
-          event.stopPropagation()
-          closeSelf()
-          setTimeout(() => {
-            closingRef.current = false
-          }, 400)
-        }
-        document.addEventListener('keydown', onEscape, true)
-        return () => document.removeEventListener('keydown', onEscape, true)
-      }, [closeSelf])
 
       const order = useChat((snapshot) => snapshot.order)
       const nodeStore = useChat((snapshot) => snapshot.nodes)
@@ -3087,17 +3032,10 @@ window.__ModuleLoader__.load({
             if (moveRowFocus(bodyRef.current, 1)) event.preventDefault()
             return
           }
-          if (event.key === 'Escape') {
-            /* Esc closes the panel, like every other dismissible surface. The document capture
-               handler usually gets here first; this branch covers a synthetic/dispatched event. */
-            if (closingRef.current) return
-            closingRef.current = true
-            event.preventDefault()
-            event.stopPropagation()
-            closeSelf()
-          }
+          /* Escape is deliberately not handled: every right-sidebar tab closes with the host's own
+             Ctrl+W, and the host owns that tooltip and binding. */
         },
-        [closeSelf, jumpFirst],
+        [jumpFirst],
       )
 
       const onListKeyDown = useCallback((event) => {
@@ -3190,7 +3128,7 @@ window.__ModuleLoader__.load({
 
       return h(
         'div',
-        { className: 'dsh-csearch-root', onKeyDown, ref: rootRef },
+        { className: 'dsh-csearch-root', onKeyDown },
         h(
           'div',
           { className: 'dsh-csearch-head' },
@@ -4242,13 +4180,6 @@ window.__ModuleLoader__.load({
                       locale: NS,
                       inject: (sessionId) => ({
                         requestOlder: () => loadOlderPage(ctx, sessionId),
-                        /* Esc closes the tab itself: the seat's own close path, not a simulated click. */
-                        closeTab: (tabId) => {
-                          const sidebar = ctx.get('sidebarRight')
-                          if (sidebar !== undefined && sidebar !== null && typeof sidebar.closeIn === 'function') {
-                            sidebar.closeIn(sessionId, tabId)
-                          }
-                        },
                       }),
                     },
                     SearchPanel,
