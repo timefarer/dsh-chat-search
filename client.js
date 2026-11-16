@@ -142,6 +142,7 @@ window.__ModuleLoader__.load({
       'truncated': '结果较多，仅显示前 {count} 条',
       'history.missing': '更早的历史尚未加载，检索可能不完整',
       'shortcut.conflict': '快捷键 {keys} 已被其它命令占用（{ids}），可能不会触发',
+      'shortcut.fallback': '默认快捷键被占用，已改用 {keys}；可在 设置 → 通用设置 → 快捷键 里改键',
       'history.target': '正在加载到该段落 · 第 {pages} 页',
       'history.load': '加载全部',
       'history.loading': '加载中…',
@@ -242,6 +243,7 @@ window.__ModuleLoader__.load({
       'truncated': 'Showing the first {count} matches',
       'history.missing': 'Older history is not loaded, so results may be incomplete',
       'shortcut.conflict': 'Shortcut {keys} is already taken by {ids}; it may not fire',
+      'shortcut.fallback': 'Default shortcut was taken; using {keys}. Rebind it in Settings → General → Shortcuts.',
       'history.target': 'Loading up to that paragraph · page {pages}',
       'history.load': 'Load all',
       'history.loading': 'Loading…',
@@ -2172,25 +2174,43 @@ window.__ModuleLoader__.load({
           },
         ]
         for (const command of commands) {
-          try {
-            const dispose = shortcuts.register({
-              id: command.id,
-              label: command.label,
-              aliases: command.aliases,
-              defaults: {
-                'desktop:macos': { code: command.id.endsWith('.global') ? 'KeyQ' : 'KeyF', modifiers: command.id.endsWith('.global') ? ['primary', 'alt'] : ['primary'] },
-                'desktop:windows': { code: command.id.endsWith('.global') ? 'KeyQ' : 'KeyF', modifiers: command.id.endsWith('.global') ? ['primary', 'alt'] : ['primary'] },
-                'desktop:linux': { code: command.id.endsWith('.global') ? 'KeyQ' : 'KeyF', modifiers: command.id.endsWith('.global') ? ['primary', 'alt'] : ['primary'] },
-              },
-              regions: ['page', 'editable'],
-              modals: [],
-              resolve: () => ({ status: 'handled', run: command.run }),
-            })
-            if (typeof dispose === 'function') disposeList.push(dispose)
-            if (command.id.endsWith('.global')) noteShortcutConflict(shortcuts, command.id, 'KeyQ', ['primary', 'alt'])
-          } catch (error) {
-            debugLog('shortcut registry refused the binding', { id: command.id, message: String(error && error.message) })
+          const isGlobal = command.id.endsWith('.global')
+          const candidates = isGlobal ? GLOBAL_CANDIDATES : [{ code: 'KeyF', modifiers: ['primary'] }]
+          let registered = false
+          for (const binding of candidates) {
+            try {
+              const dispose = shortcuts.register({
+                id: command.id,
+                label: command.label,
+                aliases: command.aliases,
+                defaults: {
+                  'desktop:macos': binding,
+                  'desktop:windows': binding,
+                  'desktop:linux': binding,
+                },
+                regions: ['page', 'editable'],
+                modals: [],
+                resolve: () => ({ status: 'handled', run: command.run }),
+              })
+              if (typeof dispose === 'function') disposeList.push(dispose)
+              if (isGlobal) {
+                globalBinding = binding
+                if (binding !== GLOBAL_CANDIDATES[0]) {
+                  shortcutNotice = {
+                    id: command.id,
+                    keys: describeBindingKeys(shortcuts, binding),
+                    ids: [],
+                    fallback: true,
+                  }
+                }
+              }
+              registered = true
+              break
+            } catch (error) {
+              debugLog('shortcut registry refused the binding', { id: command.id, code: binding.code, message: String(error && error.message) })
+            }
           }
+          if (!registered) debugLog('shortcut command could not be registered', { id: command.id })
         }
       }
       /* The page listener is the only binding the Web runtime gets, and on desktop it stays quiet
@@ -2210,27 +2230,32 @@ window.__ModuleLoader__.load({
     /** Set when the registry reports that another command already owns our default combo. */
     let shortcutNotice = null
 
-    /**
-     * Ask the registry whether a combo is already taken.
-     *
-     * `register()` only rejects duplicates at registration time; a combo the user or another plugin
-     * bound later in Settings would silently never reach us. `describeBinding()` reports those, so
-     * the panel can say "this key belongs to X, rebind it here" instead of appearing broken.
-     */
-    function noteShortcutConflict(shortcuts, id, code, modifiers) {
+    /** The combo the registry accepted for the global page; the page-level fallback follows it. */
+    let globalBinding = { code: 'KeyQ', modifiers: ['primary', 'alt'] }
+
+    /* The registry throws when a default overlaps another command, and a throw would drop the whole
+       command from Settings. Try a few free combos instead: the first accepted one becomes the
+       default, so the command is always visible and rebindable. */
+    const GLOBAL_CANDIDATES = [
+      { code: 'KeyQ', modifiers: ['primary', 'alt'] },
+      { code: 'Digit1', modifiers: ['primary', 'alt'] },
+      { code: 'KeyK', modifiers: ['primary', 'alt'] },
+      { code: 'KeyJ', modifiers: ['primary', 'alt'] },
+    ]
+
+    /** Human-readable keys for a binding, preferring the registry's own rendering. */
+    function describeBindingKeys(shortcuts, binding) {
       try {
-        if (shortcuts === undefined || shortcuts === null || typeof shortcuts.describeBinding !== 'function') return
-        const described = shortcuts.describeBinding({ code, modifiers })
-        if (described === null || described === undefined) return
-        const conflicts = Array.isArray(described.conflicts) ? described.conflicts.filter((other) => other !== id) : []
-        if (conflicts.length === 0) return
-        const keys =
-          typeof described.keys === 'string' && described.keys !== '' ? described.keys : modifiers.concat(code).join('+')
-        shortcutNotice = { id, keys, ids: conflicts }
-        console.warn('[conversation-search] shortcut conflict:', keys, '->', conflicts.join(', '))
+        if (shortcuts !== undefined && shortcuts !== null && typeof shortcuts.describeBinding === 'function') {
+          const described = shortcuts.describeBinding(binding)
+          if (described !== null && described !== undefined && typeof described.keys === 'string' && described.keys !== '') {
+            return described.keys
+          }
+        }
       } catch (error) {
-        debugLog('shortcut conflict check failed', { message: String(error && error.message) })
+        /* Fall through to the local rendering. */
       }
+      return binding.modifiers.concat(binding.code).join('+')
     }
 
     /** Page-level bindings: Ctrl/Cmd+F opens the panel, Ctrl/Cmd+Alt+Q the global page. */
@@ -2240,8 +2265,13 @@ window.__ModuleLoader__.load({
         if (!(event.ctrlKey || event.metaKey)) return
         if (event.altKey) {
           /* Alt is reserved for the global page; Shift stays untouched because many IMEs take
-             Ctrl+Shift+F (and Ctrl+Shift+letter generally) before the page sees it. */
-          if (typeof event.key !== 'string' || event.key.toLowerCase() !== 'q') return
+             Ctrl+Shift+F (and Ctrl+Shift+letter generally) before the page sees it. The code follows
+             whichever combo the registry accepted (the default may have been taken). */
+          const code = typeof event.code === 'string' && event.code !== '' ? event.code : ''
+          const key = typeof event.key === 'string' ? event.key.toLowerCase() : ''
+          const keyForCode = { KeyQ: 'q', KeyK: 'k', KeyJ: 'j', Digit1: '1' }
+          const matches = code === globalBinding.code || (code === '' && key === (keyForCode[globalBinding.code] || ''))
+          if (!matches) return
           const target = event.target
           const inEditor =
             target !== null &&
@@ -3202,7 +3232,13 @@ window.__ModuleLoader__.load({
             : h(
                 'div',
                 { className: 'dsh-csearch-banner dsh-csearch-banner-warn', role: 'status' },
-                h('span', null, t('shortcut.conflict', { keys: shortcutNotice.keys, ids: shortcutNotice.ids.join(', ') })),
+                h(
+                  'span',
+                  null,
+                  shortcutNotice.fallback === true
+                    ? t('shortcut.fallback', { keys: shortcutNotice.keys })
+                    : t('shortcut.conflict', { keys: shortcutNotice.keys, ids: shortcutNotice.ids.join(', ') }),
+                ),
               ),
           showBanner
             ? h(

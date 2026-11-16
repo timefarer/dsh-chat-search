@@ -214,6 +214,7 @@ const zh = {
   'history.missing': '更早的历史尚未加载',
   'history.target': '正在加载到该段落 · 第 {pages} 页',
   'shortcut.conflict': '快捷键 {keys} 已被其它命令占用（{ids}），可能不会触发',
+  'shortcut.fallback': '默认快捷键被占用，已改用 {keys}；可在 设置 → 通用设置 → 快捷键 里改键',
   'history.load': '加载全部',
   'history.loading': '加载中…',
   'history.failed': '无法加载',
@@ -322,14 +323,16 @@ const services = {
   },
   layout: { selectPanel() {} },
   shortcuts: {
+    /* Simulates another command already owning Ctrl+Alt+Q: the registry throws on an overlapping
+       default, so the plugin must retry with the next candidate instead of dropping the command. */
     register(definition) {
+      const binding = definition.defaults === undefined ? null : definition.defaults['desktop:windows']
+      if (binding !== null && binding.code === 'KeyQ') throw new Error('overlapping default binding')
       shortcutDefinitions.push(definition)
       return () => {}
     },
-    /* Simulates another command already owning the global combo, so the panel's conflict banner
-       has something to report. */
     describeBinding() {
-      return { keys: 'Ctrl+Alt+Q', conflicts: ['another-plugin.split-session'], issue: undefined }
+      return { keys: 'Ctrl+Alt+Digit1', conflicts: [], issue: undefined }
     },
   },
 }
@@ -597,7 +600,7 @@ check('assistant role label', panelText.includes('回复'))
 check('user role label', panelText.includes('提问'))
 check('unrelated paragraph excluded', !panelText.includes('这一段落与搜索词无关'))
 /* The registry reported another owner for Ctrl+Alt+Q: the panel must say so instead of looking broken. */
-check('shortcut conflict is surfaced in the panel', panelText.includes('已被其它命令占用'), panelText.slice(0, 260))
+check('shortcut fallback is surfaced in the panel', panelText.includes('默认快捷键被占用'), panelText.slice(0, 260))
 
 /* The second reply message of Turn 1: paragraph numbers continue across messages, and the file
    row of the first message must not consume a number (the Host numbers paragraphs the same way). */
@@ -806,14 +809,14 @@ check('find shortcut resolves as handled', resolution !== null && resolution.sta
 if (resolution !== null && resolution.status === 'handled') resolution.run()
 check('find shortcut opens the search tab', openedTabs.includes('conversation-search'), JSON.stringify(openedTabs))
 
-/* The global page has its own binding: Ctrl/Cmd+Alt+Q (Alt, not Shift: Ctrl+Shift+F belongs to the
-   IME; Ctrl+Alt+F belongs to another plugin), also desktop-only for the same reason. */
+/* The global page falls back through the candidate list: Ctrl+Alt+Q is taken in this mock, so the
+   registry must accept the next free combo instead of dropping the command entirely. */
 const globalDefinition = shortcutDefinitions.find((definition) => definition.id === 'conversation-search.global')
 check('global shortcut registered', globalDefinition !== undefined, JSON.stringify(shortcutDefinitions.map((d) => d.id)))
 check(
-  'global shortcut binds Ctrl/Cmd+Alt+Q',
+  'global shortcut falls back to a free combo',
   globalDefinition !== undefined &&
-    globalDefinition.defaults['desktop:windows'].code === 'KeyQ' &&
+    globalDefinition.defaults['desktop:windows'].code === 'Digit1' &&
     globalDefinition.defaults['desktop:windows'].modifiers.includes('primary') &&
     globalDefinition.defaults['desktop:windows'].modifiers.includes('alt') &&
     !globalDefinition.defaults['desktop:windows'].modifiers.includes('shift'),
