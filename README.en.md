@@ -44,7 +44,7 @@ paragraphs, file names and hit counts.
 - **Visible landing** — a click opens the session, pages in missing history, resolves the turn,
   then highlights the matched words with the browser's own find styling that follows scrolling;
   the landed paragraph also gets a **blue selection wash**, distinct from the amber keywords.
-- **One keystroke** — `Ctrl/Cmd+F` opens the panel; Enter jumps to the first hit.
+- **One keystroke** — `Ctrl/Cmd+F` opens the panel, `Ctrl/Cmd+Alt+F` the global page (Alt, because `Ctrl+Shift+F` is the IME simplified/traditional toggle); `Esc` closes the panel; Enter jumps to the first hit.
 
 ## Install
 

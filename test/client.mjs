@@ -780,15 +780,17 @@ check('find shortcut resolves as handled', resolution !== null && resolution.sta
 if (resolution !== null && resolution.status === 'handled') resolution.run()
 check('find shortcut opens the search tab', openedTabs.includes('conversation-search'), JSON.stringify(openedTabs))
 
-/* The global page has its own binding: Ctrl/Cmd+Shift+F, also desktop-only for the same reason. */
+/* The global page has its own binding: Ctrl/Cmd+Alt+F (Alt, not Shift: Ctrl+Shift+F belongs to the
+   IME's simplified/traditional toggle), also desktop-only for the same reason. */
 const globalDefinition = shortcutDefinitions.find((definition) => definition.id === 'conversation-search.global')
 check('global shortcut registered', globalDefinition !== undefined, JSON.stringify(shortcutDefinitions.map((d) => d.id)))
 check(
-  'global shortcut binds Ctrl/Cmd+Shift+F',
+  'global shortcut binds Ctrl/Cmd+Alt+F',
   globalDefinition !== undefined &&
     globalDefinition.defaults['desktop:windows'].code === 'KeyF' &&
     globalDefinition.defaults['desktop:windows'].modifiers.includes('primary') &&
-    globalDefinition.defaults['desktop:windows'].modifiers.includes('shift'),
+    globalDefinition.defaults['desktop:windows'].modifiers.includes('alt') &&
+    !globalDefinition.defaults['desktop:windows'].modifiers.includes('shift'),
   globalDefinition === undefined ? 'no definition' : JSON.stringify(globalDefinition.defaults['desktop:windows']),
 )
 check(
@@ -818,6 +820,25 @@ if (closeRoot !== null && typeof closeRoot.props.onKeyDown === 'function') {
   })
   check('Escape closes the panel', closeCalls.includes('tab-under-test') && prevented, JSON.stringify(closeCalls))
 }
+
+/* The seat's own close action wins when it exists: it knows the live tab id, the injected fallback
+   only knows the registered kind id. */
+const actionCalls = []
+const actionProps = {
+  ...panelProps,
+  closeTab: () => actionCalls.push('fallback'),
+  useTabInfo: () => ({ tab: { id: 'tab-under-test', tabActions: { close: () => actionCalls.push('seat') } } }),
+}
+const actionTree = await settle('panel-close-action', bodyRegistration.Component, actionProps)
+const actionRoot = findNode(actionTree, 'dsh-csearch-root')
+if (actionRoot !== null && typeof actionRoot.props.onKeyDown === 'function') {
+  actionRoot.props.onKeyDown({
+    key: 'Escape',
+    preventDefault: () => {},
+    stopPropagation: () => {},
+  })
+}
+check('Escape prefers the seat close action', JSON.stringify(actionCalls) === '["seat"]', JSON.stringify(actionCalls))
 
 // #endregion
 

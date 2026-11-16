@@ -2143,7 +2143,8 @@ window.__ModuleLoader__.load({
      * only, and the page keeps its own listener for the Web.
      *
      *   Ctrl/Cmd+F        in-conversation panel
-     *   Ctrl/Cmd+Shift+F  global search page
+     *   Ctrl/Cmd+Alt+F    global search page (Alt instead of Shift: Ctrl+Shift+F is the IME's
+     *                     simplified/traditional toggle and never reaches the page)
      */
     function registerFindShortcut(ctx, t, open) {
       const shortcuts = ctx.get('shortcuts')
@@ -2170,9 +2171,9 @@ window.__ModuleLoader__.load({
               label: command.label,
               aliases: command.aliases,
               defaults: {
-                'desktop:macos': { code: 'KeyF', modifiers: command.id.endsWith('.global') ? ['primary', 'shift'] : ['primary'] },
-                'desktop:windows': { code: 'KeyF', modifiers: command.id.endsWith('.global') ? ['primary', 'shift'] : ['primary'] },
-                'desktop:linux': { code: 'KeyF', modifiers: command.id.endsWith('.global') ? ['primary', 'shift'] : ['primary'] },
+                'desktop:macos': { code: 'KeyF', modifiers: command.id.endsWith('.global') ? ['primary', 'alt'] : ['primary'] },
+                'desktop:windows': { code: 'KeyF', modifiers: command.id.endsWith('.global') ? ['primary', 'alt'] : ['primary'] },
+                'desktop:linux': { code: 'KeyF', modifiers: command.id.endsWith('.global') ? ['primary', 'alt'] : ['primary'] },
               },
               regions: ['page', 'editable'],
               modals: [],
@@ -2198,12 +2199,12 @@ window.__ModuleLoader__.load({
       }
     }
 
-    /** Page-level bindings for Ctrl/Cmd+F and Ctrl/Cmd+Shift+F; skipped when already handled. */
+    /** Page-level bindings: Ctrl/Cmd+F opens the panel, Ctrl/Cmd+Alt+F the global page. */
     function registerDomFindShortcut(open, openGlobal) {
       if (typeof document === 'undefined' || typeof document.addEventListener !== 'function') return () => {}
       const handler = (event) => {
         if (event.defaultPrevented) return
-        if (!(event.ctrlKey || event.metaKey) || event.altKey) return
+        if (!(event.ctrlKey || event.metaKey)) return
         if (typeof event.key !== 'string' || event.key.toLowerCase() !== 'f') return
         const target = event.target
         const inEditor =
@@ -2212,9 +2213,16 @@ window.__ModuleLoader__.load({
           typeof target.closest === 'function' &&
           target.closest('.cm-editor, .xterm, .xterm-helper-textarea') !== null
         if (inEditor) return
+        /* Alt goes to the global page; plain goes to the panel. Shift is deliberately left alone:
+           many IMEs take Ctrl+Shift+F for the simplified/traditional toggle before we ever see it. */
+        if (event.altKey) {
+          event.preventDefault()
+          openGlobal()
+          return
+        }
+        if (event.shiftKey) return
         event.preventDefault()
-        if (event.shiftKey) openGlobal()
-        else open()
+        open()
       }
       /* Bubble phase on purpose: a registry binding on document/window runs first and marks the
          event handled, so the two never both act on one press. */
@@ -2733,12 +2741,47 @@ window.__ModuleLoader__.load({
         try {
           const info = typeof useTabInfo === 'function' ? useTabInfo() : null
           const tab = info !== null && info !== undefined && info.tab !== null && info.tab !== undefined ? info.tab : null
+          /* The seat hands the tab its own close action; that is the only path guaranteed to know
+             the instance id (the registered kind id and the live tab id are not the same value). */
+          const actions = tab !== null && tab.tabActions !== undefined && tab.tabActions !== null ? tab.tabActions : null
+          if (actions !== null && typeof actions.close === 'function') {
+            actions.close()
+            return
+          }
           const tabId = tab !== null && typeof tab.id === 'string' ? tab.id : ''
           if (tabId !== '' && typeof closeTab === 'function') closeTab(tabId)
         } catch (error) {
           debugLog('closing the search tab failed', { message: String(error && error.message) })
         }
       }, [useTabInfo, closeTab])
+
+      const rootRef = useRef(null)
+      const closingRef = useRef(false)
+
+      /* Esc closes the tab even when focus sits on a result row or the tab header. The document
+         capture listener only acts while this panel owns the focus, so host dialogs keep their Esc. */
+      useEffect(() => {
+        if (typeof document === 'undefined' || typeof document.addEventListener !== 'function') return undefined
+        const onEscape = (event) => {
+          if (event.key !== 'Escape' || closingRef.current) return
+          const root = rootRef.current
+          const active = document.activeElement
+          const inside =
+            root !== null &&
+            root !== undefined &&
+            (root.contains(event.target) || (active !== null && active !== undefined && root.contains(active)))
+          if (!inside) return
+          closingRef.current = true
+          event.preventDefault()
+          event.stopPropagation()
+          closeSelf()
+          setTimeout(() => {
+            closingRef.current = false
+          }, 400)
+        }
+        document.addEventListener('keydown', onEscape, true)
+        return () => document.removeEventListener('keydown', onEscape, true)
+      }, [closeSelf])
 
       const order = useChat((snapshot) => snapshot.order)
       const nodeStore = useChat((snapshot) => snapshot.nodes)
@@ -2999,7 +3042,10 @@ window.__ModuleLoader__.load({
             return
           }
           if (event.key === 'Escape') {
-            /* Esc closes the panel, like every other dismissible surface. */
+            /* Esc closes the panel, like every other dismissible surface. The document capture
+               handler usually gets here first; this branch covers a synthetic/dispatched event. */
+            if (closingRef.current) return
+            closingRef.current = true
             event.preventDefault()
             event.stopPropagation()
             closeSelf()
@@ -3098,7 +3144,7 @@ window.__ModuleLoader__.load({
 
       return h(
         'div',
-        { className: 'dsh-csearch-root', onKeyDown },
+        { className: 'dsh-csearch-root', onKeyDown, ref: rootRef },
         h(
           'div',
           { className: 'dsh-csearch-head' },
