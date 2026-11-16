@@ -127,9 +127,9 @@ route; the client suite loads `client.js` with a minimal React runtime and asser
 registrations, the panel tree, the global page, the jump payload, the filter window and the
 shortcut.
 
-Design notes are in Chinese under [`docs/`](docs/): [`DESIGN.md`](docs/DESIGN.md) (architecture
-and algorithms), [`SHOWCASE.md`](docs/SHOWCASE.md) (walkthrough), plus requirements and bug
-history.
+Design notes are in Chinese under [`docs/`](docs/): [`SHOWCASE.md`](docs/SHOWCASE.md)
+(walkthrough) and [`FEATURES.md`](docs/FEATURES.md) (capability list); known limits are in
+[`docs/KNOWN-ISSUES.md`](docs/KNOWN-ISSUES.md).
 
 ## License
 

@@ -1,15 +1,13 @@
 # dsh-chat-search · 文档索引
 
-本目录保存 `dsh-chat-search` 的设计与维护资料，供后续迭代和排查使用。
-目录**不随 npm 包发布**（`package.json` 的 `files` 只收运行时文件），只在仓库里阅读。
+本目录只放**对外**可读的资料（随仓库发布，不进 npm 包）。
+内部管理资料（规划 / 需求 / 任务 / 缺陷 / 设计）在 `.notes/manage/`，**不进入 GitHub**。
 
 | 文档 | 内容 |
 |---|---|
 | [SHOWCASE.md](./SHOWCASE.md) | 功能演示：两个入口、结果树示例、五个真实用法、能力边界 |
-| [DESIGN.md](./DESIGN.md) | 设计说明：架构、数据流、协议、跳转算法、筛选窗口、性能取舍 |
-| [REQUIREMENTS.md](./REQUIREMENTS.md) | 需求列表与完成状态 |
 | [FEATURES.md](./FEATURES.md) | 功能清单（用户可见能力 + 内部机制） |
-| [BUGS.md](./BUGS.md) | 缺陷记录、根因与修复状态 |
+| [KNOWN-ISSUES.md](./KNOWN-ISSUES.md) | 已知限制与暂不支持的行为（轻量清单） |
 
 ## 一句话概述
 
@@ -17,9 +15,8 @@
 
 ## 当前状态
 
-- 版本：`1.2.0`
-- 包名：`dsh-chat-search`（npm latest `1.1.1`，`1.2.0` 待发布）；宿主行 id 仍是 `conversation-search`
+- 版本：`1.2.5`
+- 包名：`dsh-chat-search`；宿主行 id 仍是 `conversation-search`
 - 测试：`test/host.mjs`、`test/client.mjs`（`npm test`）
 - 安装：应用内「插件 → 添加插件」搜 `dsh-chat-search`；或 `dsh plugin add dsh-chat-search`
-- 仓库位置：`deepseek-harness/projects/dsh-chat-search`
-- 已知限制见 [DESIGN.md](./DESIGN.md#13-已知限制) 与 [BUGS.md](./BUGS.md) 中标记为「已知/待办」的条目
+- 已知限制：[KNOWN-ISSUES.md](./KNOWN-ISSUES.md)

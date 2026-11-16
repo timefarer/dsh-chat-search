@@ -121,8 +121,8 @@ npm test        # Host 无头测试 + 客户端无头测试
 `client.js`，断言注册项、面板树、全局页、跳转载荷、筛选窗口与快捷键。
 
 设计资料（中文）：[`docs/SHOWCASE.md`](docs/SHOWCASE.md)（功能演示与真实场景）、
-[`docs/DESIGN.md`](docs/DESIGN.md)（架构与算法）、需求与缺陷记录：
-[`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md)、[`docs/BUGS.md`](docs/BUGS.md)。
+[`docs/FEATURES.md`](docs/FEATURES.md)（功能清单）；已知限制见
+[`docs/KNOWN-ISSUES.md`](docs/KNOWN-ISSUES.md)。
 
 ## English summary
 
