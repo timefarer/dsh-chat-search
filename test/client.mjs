@@ -550,6 +550,18 @@ check(
 check('left rail icon registered', byName('sidebar.panellist').some((entry) => entry.options.id === 'global-search'))
 check('global page registered', byName('main').some((entry) => entry.options.key === 'global-search'))
 check('tab type registered', tabDefinition !== null)
+/* The start-page guide lists registered types that contribute a capsule; picking it opens the tab. */
+const guide = tabDefinition === null ? undefined : tabDefinition.guide
+check(
+  'tab type contributes a guide capsule',
+  Array.isArray(guide) && guide.length === 1 && guide[0].id === tabDefinition.id && guide[0].order > 0,
+  JSON.stringify(guide),
+)
+check(
+  'guide capsule has localized copy',
+  Array.isArray(guide) && guide.length === 1 && typeof guide[0].title() === 'string' && typeof guide[0].description() === 'string',
+  Array.isArray(guide) && guide.length === 1 ? JSON.stringify([guide[0].title(), guide[0].description()]) : 'no guide',
+)
 check('body registered under the type id', byName('sidebar.right.pane.tab').length === 1)
 
 // #region in-conversation panel -----------------------------------------------

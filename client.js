@@ -126,6 +126,7 @@ window.__ModuleLoader__.load({
     const zh = {
       'meta.title': '对话检索',
       'tab.title': '对话检索',
+      'tab.guideDesc': '在当前会话里搜聊天记录、段落与文件名',
       'action.open': '检索当前对话',
       'placeholder': '输入关键词，检索本对话全部消息',
       'hint.title': '检索当前对话',
@@ -225,6 +226,7 @@ window.__ModuleLoader__.load({
     const en = {
       'meta.title': 'Conversation search',
       'tab.title': 'Search',
+      'tab.guideDesc': 'Search this conversation by paragraph or file name',
       'action.open': 'Search this conversation',
       'placeholder': 'Type keywords to search every message',
       'hint.title': 'Search this conversation',
@@ -4169,6 +4171,16 @@ window.__ModuleLoader__.load({
                   kind: TAB_KIND,
                   priority: 'extension',
                   title: () => t('tab.title'),
+                  /* Start-page capsule: the host's guide (and Better Sidebar's guide catalog) lists
+                     every registered type that contributes one, and picking it opens this tab. */
+                  guide: [
+                    {
+                      id: TAB_ID,
+                      order: 30,
+                      title: () => t('tab.title'),
+                      description: () => t('tab.guideDesc'),
+                    },
+                  ],
                 }),
               )
               disposers.push(
