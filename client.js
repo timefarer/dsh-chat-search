@@ -64,6 +64,8 @@ window.__ModuleLoader__.load({
           /* The last landing, so "clicked but nothing moved" can be answered with numbers. */
           jump: jumpTiming.last,
           reasserts: jumpTiming.reasserts,
+          /* Which command already owns our default combo, when the registry says so. */
+          shortcutConflict: shortcutNotice,
           followingTail: (() => {
             try {
               return document.querySelector('[data-chat-following-tail]') !== null
@@ -138,6 +140,7 @@ window.__ModuleLoader__.load({
       'summary': '{turns} 组 · {matches} 条结果',
       'truncated': '结果较多，仅显示前 {count} 条',
       'history.missing': '更早的历史尚未加载，检索可能不完整',
+      'shortcut.conflict': '快捷键 {keys} 与其它命令冲突（{ids}），可在 设置 → 快捷键 里改键',
       'history.target': '正在加载到该段落 · 第 {pages} 页',
       'history.load': '加载全部',
       'history.loading': '加载中…',
@@ -236,6 +239,7 @@ window.__ModuleLoader__.load({
       'summary': '{turns} groups · {matches} matches',
       'truncated': 'Showing the first {count} matches',
       'history.missing': 'Older history is not loaded, so results may be incomplete',
+      'shortcut.conflict': 'Shortcut {keys} is already used by {ids}; rebind it in Settings → Shortcuts',
       'history.target': 'Loading up to that paragraph · page {pages}',
       'history.load': 'Load all',
       'history.loading': 'Loading…',
@@ -335,6 +339,7 @@ window.__ModuleLoader__.load({
       '.dsh-csearch-clear:hover{background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary)}',
       '.dsh-csearch-clear svg{width:11px;height:11px}',
       '.dsh-csearch-banner{display:flex;align-items:center;gap:8px;padding:6px 8px;border:.5px dashed var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-sm,8px);color:var(--dsw-alias-label-secondary);line-height:1.45}',
+      '.dsh-csearch-banner-warn{border-color:#f0d3a8;background:#fff7e6;color:#8a5300}',
       '.dsh-csearch-banner button{margin-left:auto;flex:none;height:24px;padding:0 8px;border:.5px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-sm,8px);background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit;font-size:12px;cursor:pointer}',
       '.dsh-csearch-banner button:hover:not(:disabled){border-color:var(--dsw-alias-brand-primary)}',
       '.dsh-csearch-banner button:disabled{opacity:.55;cursor:default}',
@@ -2143,7 +2148,7 @@ window.__ModuleLoader__.load({
      * only, and the page keeps its own listener for the Web.
      *
      *   Ctrl/Cmd+F        in-conversation panel
-     *   Ctrl/Cmd+Alt+F    global search page (Alt instead of Shift: Ctrl+Shift+F is the IME's
+     *   Ctrl/Cmd+Alt+Q    global search page (Alt instead of Shift: Ctrl+Shift+F is the IME's
      *                     simplified/traditional toggle and never reaches the page)
      */
     function registerFindShortcut(ctx, t, open) {
@@ -2171,15 +2176,16 @@ window.__ModuleLoader__.load({
               label: command.label,
               aliases: command.aliases,
               defaults: {
-                'desktop:macos': { code: 'KeyF', modifiers: command.id.endsWith('.global') ? ['primary', 'alt'] : ['primary'] },
-                'desktop:windows': { code: 'KeyF', modifiers: command.id.endsWith('.global') ? ['primary', 'alt'] : ['primary'] },
-                'desktop:linux': { code: 'KeyF', modifiers: command.id.endsWith('.global') ? ['primary', 'alt'] : ['primary'] },
+                'desktop:macos': { code: command.id.endsWith('.global') ? 'KeyQ' : 'KeyF', modifiers: command.id.endsWith('.global') ? ['primary', 'alt'] : ['primary'] },
+                'desktop:windows': { code: command.id.endsWith('.global') ? 'KeyQ' : 'KeyF', modifiers: command.id.endsWith('.global') ? ['primary', 'alt'] : ['primary'] },
+                'desktop:linux': { code: command.id.endsWith('.global') ? 'KeyQ' : 'KeyF', modifiers: command.id.endsWith('.global') ? ['primary', 'alt'] : ['primary'] },
               },
               regions: ['page', 'editable'],
               modals: [],
               resolve: () => ({ status: 'handled', run: command.run }),
             })
             if (typeof dispose === 'function') disposeList.push(dispose)
+            if (command.id.endsWith('.global')) noteShortcutConflict(shortcuts, command.id, 'KeyQ', ['primary', 'alt'])
           } catch (error) {
             debugLog('shortcut registry refused the binding', { id: command.id, message: String(error && error.message) })
           }
@@ -2199,12 +2205,53 @@ window.__ModuleLoader__.load({
       }
     }
 
-    /** Page-level bindings: Ctrl/Cmd+F opens the panel, Ctrl/Cmd+Alt+F the global page. */
-    function registerDomFindShortcut(open, openGlobal) {
-      if (typeof document === 'undefined' || typeof document.addEventListener !== 'function') return () => {}
+    /** Set when the registry reports that another command already owns our default combo. */
+    let shortcutNotice = null
+
+    /**
+     * Ask the registry whether a combo is already taken.
+     *
+     * `register()` only rejects duplicates at registration time; a combo the user or another plugin
+     * bound later in Settings would silently never reach us. `describeBinding()` reports those, so
+     * the panel can say "this key belongs to X, rebind it here" instead of appearing broken.
+     */
+    function noteShortcutConflict(shortcuts, id, code, modifiers) {
+      try {
+        if (shortcuts === undefined || shortcuts === null || typeof shortcuts.describeBinding !== 'function') return
+        const described = shortcuts.describeBinding({ code, modifiers })
+        if (described === null || described === undefined) return
+        const conflicts = Array.isArray(described.conflicts) ? described.conflicts.filter((other) => other !== id) : []
+        if (conflicts.length === 0) return
+        const keys =
+          typeof described.keys === 'string' && described.keys !== '' ? described.keys : modifiers.concat(code).join('+')
+        shortcutNotice = { id, keys, ids: conflicts }
+        console.warn('[conversation-search] shortcut conflict:', keys, '->', conflicts.join(', '))
+      } catch (error) {
+        debugLog('shortcut conflict check failed', { message: String(error && error.message) })
+      }
+    }
+
+    /** Page-level bindings: Ctrl/Cmd+F opens the panel, Ctrl/Cmd+Alt+Q the global page. */
+    function registerDomFindShortcut(open, openGlobal) {      if (typeof document === 'undefined' || typeof document.addEventListener !== 'function') return () => {}
       const handler = (event) => {
         if (event.defaultPrevented) return
         if (!(event.ctrlKey || event.metaKey)) return
+        if (event.altKey) {
+          /* Alt is reserved for the global page; Shift stays untouched because many IMEs take
+             Ctrl+Shift+F (and Ctrl+Shift+letter generally) before the page sees it. */
+          if (typeof event.key !== 'string' || event.key.toLowerCase() !== 'q') return
+          const target = event.target
+          const inEditor =
+            target !== null &&
+            target !== undefined &&
+            typeof target.closest === 'function' &&
+            target.closest('.cm-editor, .xterm, .xterm-helper-textarea') !== null
+          if (inEditor) return
+          event.preventDefault()
+          openGlobal()
+          return
+        }
+        if (event.shiftKey) return
         if (typeof event.key !== 'string' || event.key.toLowerCase() !== 'f') return
         const target = event.target
         const inEditor =
@@ -2213,14 +2260,6 @@ window.__ModuleLoader__.load({
           typeof target.closest === 'function' &&
           target.closest('.cm-editor, .xterm, .xterm-helper-textarea') !== null
         if (inEditor) return
-        /* Alt goes to the global page; plain goes to the panel. Shift is deliberately left alone:
-           many IMEs take Ctrl+Shift+F for the simplified/traditional toggle before we ever see it. */
-        if (event.altKey) {
-          event.preventDefault()
-          openGlobal()
-          return
-        }
-        if (event.shiftKey) return
         event.preventDefault()
         open()
       }
@@ -2741,9 +2780,16 @@ window.__ModuleLoader__.load({
         try {
           const info = typeof useTabInfo === 'function' ? useTabInfo() : null
           const tab = info !== null && info !== undefined && info.tab !== null && info.tab !== undefined ? info.tab : null
-          /* The seat hands the tab its own close action; that is the only path guaranteed to know
-             the instance id (the registered kind id and the live tab id are not the same value). */
-          const actions = tab !== null && tab.tabActions !== undefined && tab.tabActions !== null ? tab.tabActions : null
+          /* The seat hands the tab its own close action (`tab.actions.close`), and that is the only
+             path guaranteed to know the live tab id: the registered kind id and the tab id differ. */
+          const actions =
+            tab === null
+              ? null
+              : tab.actions !== undefined && tab.actions !== null
+                ? tab.actions
+                : tab.tabActions !== undefined && tab.tabActions !== null
+                  ? tab.tabActions
+                  : null
           if (actions !== null && typeof actions.close === 'function') {
             actions.close()
             return
@@ -3187,6 +3233,13 @@ window.__ModuleLoader__.load({
                     t('panel.scope.' + id),
                   ),
                 ),
+              ),
+          shortcutNotice === null
+            ? null
+            : h(
+                'div',
+                { className: 'dsh-csearch-banner dsh-csearch-banner-warn', role: 'status' },
+                h('span', null, t('shortcut.conflict', { keys: shortcutNotice.keys, ids: shortcutNotice.ids.join(', ') })),
               ),
           showBanner
             ? h(
