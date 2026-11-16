@@ -836,7 +836,8 @@ const actionCalls = []
 const actionProps = {
   ...panelProps,
   closeTab: () => actionCalls.push('fallback'),
-  useTabInfo: () => ({ tab: { id: 'tab-under-test', tabActions: { close: () => actionCalls.push('seat') } } }),
+  /* The live seat exposes the close action as `tab.actions` (see SidebarRightTabInfo). */
+  useTabInfo: () => ({ tab: { id: 'tab-under-test', actions: { close: () => actionCalls.push('seat') } } }),
 }
 const actionTree = await settle('panel-close-action', bodyRegistration.Component, actionProps)
 const actionRoot = findNode(actionTree, 'dsh-csearch-root')
