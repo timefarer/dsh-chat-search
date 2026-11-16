@@ -73,6 +73,7 @@ window.__ModuleLoader__.load({
           })(),
           rail: railElement === null ? null : {
             display: getComputedStyle(railElement).display,
+            left: getComputedStyle(railElement).left,
             top: getComputedStyle(railElement).top,
             height: getComputedStyle(railElement).height,
             visibility: getComputedStyle(railElement).visibility,
@@ -1369,6 +1370,11 @@ window.__ModuleLoader__.load({
     let selectedRow = null
     /** Left-edge rail that shows where the landed paragraph sits in the conversation. */
     let railElement = null
+    /* Layout can move the scrollport without a scroll event: hiding the left sidebar, opening the
+       right panel, a zoom change. Without an observer the rail keeps the old offset and looks
+       detached from its paragraph. */
+    let railObserver = null
+    let railViewportHandler = null
     /** Set as soon as the reader scrolls after a jump: the replays must stop moving the view. */
     let userScrolledSinceJump = false
 
@@ -1387,12 +1393,39 @@ window.__ModuleLoader__.load({
           document.body.appendChild(railElement)
           document.addEventListener('scroll', onRailScroll, { capture: true, passive: true })
           window.addEventListener('resize', onRailScroll)
+          if (typeof window.visualViewport !== 'undefined' && window.visualViewport !== null) {
+            railViewportHandler = () => onRailScroll()
+            window.visualViewport.addEventListener('resize', railViewportHandler)
+          }
         } catch (error) {
           railElement = null
           return
         }
       }
+      watchRailLayout()
       onRailScroll()
+    }
+
+    /** Follow the scrollport itself, so a sidebar toggle or panel resize repositions the rail. */
+    function watchRailLayout() {
+      if (typeof ResizeObserver !== 'function') return
+      if (railObserver === null) {
+        try {
+          railObserver = new ResizeObserver(() => onRailScroll())
+        } catch (error) {
+          railObserver = null
+          return
+        }
+      }
+      try {
+        railObserver.disconnect()
+        const scroller = selectedRow === null ? null : conversationScrollerOf(selectedRow)
+        if (scroller !== null) railObserver.observe(scroller)
+        const seat = document.querySelector('[data-composer-seat]')
+        if (seat !== null) railObserver.observe(seat)
+      } catch (error) {
+        /* An element that refuses observation simply falls back to scroll/resize. */
+      }
     }
 
     /** The rectangle the rail should follow: the paragraph when known, its message otherwise. */
@@ -1458,6 +1491,22 @@ window.__ModuleLoader__.load({
       }
       if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
         window.removeEventListener('resize', onRailScroll)
+      }
+      if (railViewportHandler !== null && typeof window !== 'undefined' && window.visualViewport !== undefined) {
+        try {
+          window.visualViewport.removeEventListener('resize', railViewportHandler)
+        } catch (error) {
+          /* A viewport that already went away needs no cleanup. */
+        }
+        railViewportHandler = null
+      }
+      if (railObserver !== null) {
+        try {
+          railObserver.disconnect()
+        } catch (error) {
+          /* An observer on a removed element is harmless. */
+        }
+        railObserver = null
       }
     }
 
