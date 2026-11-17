@@ -124,7 +124,7 @@ window.__ModuleLoader__.load({
     ]
 
     const zh = {
-      'meta.title': '对话检索',
+      'meta.title': '会话搜索',
       'tab.title': '会话搜索',
       'tab.guideDesc': '在当前会话里搜索聊天记录、段落与文件名',
       'action.open': '检索当前对话',
@@ -225,7 +225,7 @@ window.__ModuleLoader__.load({
     }
 
     const en = {
-      'meta.title': 'Conversation search',
+      'meta.title': 'Session search',
       'tab.title': 'Session search',
       'tab.guideDesc': 'Search this conversation by paragraph or file name',
       'action.open': 'Search this conversation',
