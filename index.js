@@ -130,10 +130,12 @@ async function handleRequest(ctx, index, recent, filters, responseCache, req, re
   const started = Date.now()
   try {
     if (payload.action === 'status') {
-      const corpus = await index.ensure()
+      /* Non-blocking on purpose: the page polls this while the first build runs, so it must answer
+         with the live progress instead of waiting for `ensure()` to finish. */
+      const snapshot = index.peek()
       sendJson(res, 200, {
         ok: true,
-        value: { sessions: corpus.size, builtAt: index.builtAt(), buildMs: index.buildMs() },
+        value: { sessions: snapshot.sessions, builtAt: snapshot.builtAt, buildMs: snapshot.buildMs, progress: snapshot.progress },
       })
       return
     }
@@ -141,7 +143,7 @@ async function handleRequest(ctx, index, recent, filters, responseCache, req, re
       const corpus = await index.ensure(payload.refresh === true)
       sendJson(res, 200, {
         ok: true,
-        value: { sessions: corpus.size, builtAt: index.builtAt(), buildMs: index.buildMs() },
+        value: { sessions: corpus.size, builtAt: index.builtAt(), buildMs: index.buildMs(), progress: index.progress() },
       })
       return
     }
@@ -498,6 +500,9 @@ function createIndex(ctx) {
   let builtAt = 0
   let buildMs = 0
   let building = null
+  /* Session counts for the first build, so the page can show a real progress bar instead of a
+     spinner. `done` counts records handed to a batch, not records that parsed successfully. */
+  let progress = { active: false, done: 0, total: 0 }
 
   async function rebuild(force) {
     const buildStarted = Date.now()
@@ -505,6 +510,7 @@ function createIndex(ctx) {
     if (query === undefined) throw new Error('sessionQuery is unavailable')
     const liveSessions = ctx.get('sessions')
     const records = await query.listSessions()
+    progress = { active: true, done: 0, total: Math.min(records.length, MAX_SESSIONS) }
     const next = new Map()
     let budget = MAX_TOTAL_CHARS
     if (force) stored.clear()
@@ -533,6 +539,7 @@ function createIndex(ctx) {
           }
         }),
       )
+      progress.done += batch.length
       for (const entry of parsed) {
         if (entry === undefined) continue
         next.set(entry.id, entry)
@@ -540,6 +547,7 @@ function createIndex(ctx) {
       }
     }
 
+    progress = { active: false, done: progress.total, total: progress.total }
     cache.clear()
     for (const [id, entry] of next) cache.set(id, entry)
     builtAt = Date.now()
@@ -564,6 +572,9 @@ function createIndex(ctx) {
     },
     builtAt: () => builtAt,
     buildMs: () => buildMs,
+    progress: () => progress,
+    /** Read the current corpus state without triggering a build. */
+    peek: () => ({ sessions: cache.size, builtAt, buildMs, progress }),
   }
 }
 

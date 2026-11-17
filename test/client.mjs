@@ -369,6 +369,17 @@ let lastSearchBody = null
 globalThis.fetch = async (url, init) => {
   const body = init === undefined || init.body === undefined ? {} : JSON.parse(init.body)
   if (body.action === 'search') lastSearchBody = body
+  /* The progress probe must terminate: an already-built index stops the page's polling. */
+  if (body.action === 'status') {
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        ok: true,
+        value: { sessions: 3, builtAt: 1000, buildMs: 12, progress: { active: false, done: 3, total: 3 } },
+      }),
+    }
+  }
   const query = typeof body.query === 'string' ? body.query : ''
   const value = {
     query,
@@ -650,6 +661,9 @@ let pageTree = await settle('page', page.Component, pageProps)
 const pageInput = findNode(pageTree, 'dsh-cg-input')
 check('global input rendered', pageInput !== null)
 check('all five scopes rendered', flatten(pageTree).join('|').includes('会话 + 问题 + 段落'))
+/* The idle page polls a non-blocking status; a built index hides the first-index hint. */
+const indexedIdleText = flatten(pageTree).join('|')
+check('first-index hint hides once the index exists', !indexedIdleText.includes('首次检索需要建立索引'), indexedIdleText.slice(0, 220))
 
 if (pageInput !== null) pageInput.props.onChange({ target: { value: '侧边栏' } })
 pageTree = await settle('page', page.Component, pageProps)

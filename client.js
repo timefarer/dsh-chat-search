@@ -154,6 +154,9 @@ window.__ModuleLoader__.load({
       'panel.scope.question': '仅问题',
       'panel.scope.paragraph': '仅段落',
       'global.title': '全局搜索',
+      /* The rail is icon-only: this longer label is the tooltip/aria text, so the scope is clear
+         next to the panel tab that is named 会话搜索. */
+      'global.railLabel': '全局搜索 · 所有会话',
       'global.placeholder': '搜索所有会话，多个关键词用空格分隔',
       'global.subtitle': '在所有会话的标题、问题与段落中检索。结果按 会话 → 问题 → 段落 展开，点击即可打开会话并定位到对应位置。',
       'global.scope.label': '检索范围',
@@ -211,6 +214,7 @@ window.__ModuleLoader__.load({
       'global.widen': '在全部范围中搜索',
       'global.recent': '最近搜索',
       'global.firstIndex': '首次检索需要建立索引，可能稍慢',
+      'global.progress': '正在建立索引 · {done}/{total} 个会话',
       'command.find': '在对话中查找',
       'command.global': '全局搜索（所有会话）',
       'filters.label': '筛选',
@@ -255,6 +259,7 @@ window.__ModuleLoader__.load({
       'panel.scope.question': 'Questions',
       'panel.scope.paragraph': 'Replies',
       'global.title': 'Global search',
+      'global.railLabel': 'Global search · all sessions',
       'global.placeholder': 'Search every session; separate keywords with spaces',
       'global.subtitle': 'Search session titles, questions, and reply paragraphs across every Session. Results expand as session → question → paragraph; a click opens the Session at that spot.',
       'global.scope.label': 'Scope',
@@ -312,6 +317,7 @@ window.__ModuleLoader__.load({
       'global.widen': 'Search all scopes',
       'global.recent': 'Recent',
       'global.firstIndex': 'The first search builds the index, so it may take a moment',
+      'global.progress': 'Building the index · {done}/{total} sessions',
       'command.find': 'Find in conversation',
       'command.global': 'Global search (all sessions)',
       'filters.label': 'Filter',
@@ -432,6 +438,10 @@ window.__ModuleLoader__.load({
       '.dsh-cg-state{padding:48px 12px;text-align:center;color:var(--dsw-alias-label-secondary);line-height:1.7}',
       /* The loading row keeps the spinner and its label on one optical line. */
       '.dsh-cg-state--row{display:flex;align-items:center;justify-content:center;gap:8px;line-height:1}',
+      '.dsh-cg-progress{display:flex;flex-direction:column;align-items:center;gap:5px;width:min(320px,70%);margin:10px auto 2px}',
+      '.dsh-cg-progress-track{width:100%;height:4px;border-radius:2px;background:var(--dsw-alias-bg-layer-2);overflow:hidden}',
+      '.dsh-cg-progress-fill{height:100%;border-radius:2px;background:var(--dsw-alias-brand-primary);transition:width .25s ease}',
+      '.dsh-cg-progress-text{font-size:12px;color:var(--dsw-alias-label-secondary);font-variant-numeric:tabular-nums}',
       '.dsh-cg-state strong{display:block;margin-bottom:6px;color:var(--dsw-alias-label-primary);font-weight:600;font-size:var(--dsh-content-font-size,14px)}',
       '.dsh-cg-error-text{display:block;margin:4px 0 12px;color:var(--dsw-alias-state-error-primary);overflow-wrap:anywhere}',
     ].join('\n')
@@ -2373,6 +2383,11 @@ window.__ModuleLoader__.load({
       return postGlobal(body, signal)
     }
 
+    /** Non-blocking index state: `progress` reports the first build while it is still running. */
+    function fetchIndexStatus(signal) {
+      return postGlobal({ action: 'status' }, signal)
+    }
+
     /** Ask the Host for the persisted query history. */
     async function fetchRecent(signal) {
       const value = await postGlobal({ action: 'recent' }, signal)
@@ -3303,6 +3318,9 @@ window.__ModuleLoader__.load({
       const [filters, setFilters] = useState(() => defaultFilters())
       const [tick, setTick] = useState(0)
       const [refreshing, setRefreshing] = useState(false)
+      /* First-build progress, polled from the Host while the corpus is still being assembled. */
+      const [build, setBuild] = useState(null)
+      const [indexBuilt, setIndexBuilt] = useState(null)
       /* The row whose jump is in flight: it spins in place, so feedback never depends on the overlay. */
       const [pendingRow, setPendingRow] = useState('')
       useEffect(() => onOpeningChange((snapshot) => {
@@ -3320,6 +3338,35 @@ window.__ModuleLoader__.load({
         lastQuery.current = query
         clearHighlight()
       }, [query])
+
+      /* Poll the non-blocking status while the first build runs: it answers with `done / total`
+         session counts, which is what the progress bar shows. Stops as soon as the index exists. */
+      useEffect(() => {
+        let cancelled = false
+        const controller = new AbortController()
+        let timer = null
+        const tick = () => {
+          fetchIndexStatus(controller.signal).then(
+            (value) => {
+              if (cancelled) return
+              const next = value !== null && value !== undefined && value.progress !== undefined ? value.progress : null
+              setBuild(next)
+              const built = typeof value.builtAt === 'number' && value.builtAt > 0
+              setIndexBuilt(built)
+              if ((next !== null && next.active === true) || !built) timer = setTimeout(tick, 500)
+            },
+            () => {
+              /* A failed probe leaves the page on its normal states. */
+            },
+          )
+        }
+        tick()
+        return () => {
+          cancelled = true
+          controller.abort()
+          if (timer !== null) clearTimeout(timer)
+        }
+      }, [])
 
       useEffect(() => {
         const trimmed = query.trim()
@@ -3779,13 +3826,37 @@ window.__ModuleLoader__.load({
         [result, expanded, resultWords, openTarget],
       )
 
+      const progressPercent =
+        build !== null && build.total > 0 ? Math.min(100, Math.round((build.done / build.total) * 100)) : 0
+      /* A real bar while the Host reports counts; nothing once the index exists. */
+      const buildBar =
+        build !== null && build.active === true && build.total > 0
+          ? h(
+              'div',
+              {
+                className: 'dsh-cg-progress',
+                role: 'progressbar',
+                'aria-valuenow': progressPercent,
+                'aria-valuemin': 0,
+                'aria-valuemax': 100,
+              },
+              h(
+                'div',
+                { className: 'dsh-cg-progress-track' },
+                h('div', { className: 'dsh-cg-progress-fill', style: { width: progressPercent + '%' } }),
+              ),
+              h('span', { className: 'dsh-cg-progress-text' }, t('global.progress', { done: build.done, total: build.total })),
+            )
+          : null
+
       let body
       if (query.trim() === '' || status === 'idle') {
         body = h(
           'div',
           { className: 'dsh-cg-state' },
           h('strong', null, t('global.idle')),
-          h('span', null, t('global.firstIndex')),
+          indexBuilt === true ? null : h('span', null, t('global.firstIndex')),
+          buildBar,
           recent.length === 0
             ? null
             : h(
@@ -3808,9 +3879,9 @@ window.__ModuleLoader__.load({
       } else if (result === null) {
         body = h(
           'div',
-          { className: 'dsh-cg-state dsh-cg-state--row' },
-          spinner(),
-          h('span', null, t('global.loading')),
+          { className: 'dsh-cg-state' },
+          h('div', { className: 'dsh-cg-state dsh-cg-state--row' }, spinner(), h('span', null, t('global.loading'))),
+          buildBar,
         )
       } else if (sessions.length === 0) {
         body = h(
@@ -4135,7 +4206,7 @@ window.__ModuleLoader__.load({
                 name: 'sidebar.panellist',
                 id: PANEL_ID,
                 order: 5,
-                label: () => t('global.title'),
+                label: () => t('global.railLabel'),
                 locale: NS,
               },
               GlobalSearchIcon,

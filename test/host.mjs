@@ -318,6 +318,16 @@ check(
 const refreshed = await post({ action: 'search', query: '侧边栏', scope: 'all', refresh: true })
 check('refresh rebuilds and answers', refreshed.status === 200 && refreshed.body.ok === true)
 
+/* The page polls status while the first build runs; it must report session counts. */
+const statusNow = await post({ action: 'status' })
+const statusValue = statusNow.body.value
+check(
+  'status reports build progress',
+  statusValue.progress !== undefined && typeof statusValue.progress.total === 'number' && statusValue.progress.total >= 0,
+  JSON.stringify(statusValue.progress),
+)
+check('status stays non-blocking', statusNow.status === 200, String(statusNow.status))
+
 // #endregion
 
 // #region turn numbering ------------------------------------------------------
