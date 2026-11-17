@@ -221,8 +221,10 @@ const zh = {
   'jump.missing': '尚未加载',
   'clear': '清空',
   'global.title': '全局搜索',
-  'global.placeholder': '搜索所有会话',
-  'global.subtitle': '副标题',
+  'global.placeholder': '支持模糊搜索，多个关键词用空格分隔',
+  'global.subtitle': '支持检索全部会话的标题、问题、段落与文件；结果按“会话 → 问题 → 段落”展开，点击即可打开会话并定位到对应位置。',
+  'global.building': '正在建立索引…',
+  'global.ready': '索引已就绪 · 共 {count} 个会话',
   'global.scope.label': '检索范围',
   'global.scope.all': '会话 + 问题 + 段落',
   'global.scope.sessionQuestion': '会话 + 问题',
@@ -664,6 +666,12 @@ check('all five scopes rendered', flatten(pageTree).join('|').includes('会话 +
 /* The idle page polls a non-blocking status; a built index hides the first-index hint. */
 const indexedIdleText = flatten(pageTree).join('|')
 check('first-index hint hides once the index exists', !indexedIdleText.includes('首次检索需要建立索引'), indexedIdleText.slice(0, 220))
+check(
+  'placeholder explains the multi-keyword search',
+  pageInput !== null && typeof pageInput.props.placeholder === 'string' && pageInput.props.placeholder.includes('支持模糊搜索'),
+  pageInput === null ? 'no input' : String(pageInput.props.placeholder),
+)
+check('subtitle names the four match targets', indexedIdleText.includes('标题、问题、段落与文件'), indexedIdleText.slice(0, 260))
 
 if (pageInput !== null) pageInput.props.onChange({ target: { value: '侧边栏' } })
 pageTree = await settle('page', page.Component, pageProps)

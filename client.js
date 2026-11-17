@@ -157,8 +157,10 @@ window.__ModuleLoader__.load({
       /* The rail is icon-only: this longer label is the tooltip/aria text, so the scope is clear
          next to the panel tab that is named 会话搜索. */
       'global.railLabel': '全局搜索 · 所有会话',
-      'global.placeholder': '搜索所有会话，多个关键词用空格分隔',
-      'global.subtitle': '在所有会话的标题、问题与段落中检索。结果按 会话 → 问题 → 段落 展开，点击即可打开会话并定位到对应位置。',
+      'global.placeholder': '支持模糊搜索，多个关键词用空格分隔',
+      'global.subtitle': '支持检索全部会话的标题、问题、段落与文件；结果按“会话 → 问题 → 段落”展开，点击即可打开会话并定位到对应位置。',
+      'global.building': '正在建立索引…',
+      'global.ready': '索引已就绪 · 共 {count} 个会话',
       'global.scope.label': '检索范围',
       'global.scope.all': '会话 + 问题 + 段落',
       'global.scope.sessionQuestion': '会话 + 问题',
@@ -260,8 +262,10 @@ window.__ModuleLoader__.load({
       'panel.scope.paragraph': 'Replies',
       'global.title': 'Global search',
       'global.railLabel': 'Global search · all sessions',
-      'global.placeholder': 'Search every session; separate keywords with spaces',
-      'global.subtitle': 'Search session titles, questions, and reply paragraphs across every Session. Results expand as session → question → paragraph; a click opens the Session at that spot.',
+      'global.placeholder': 'Fuzzy search; separate keywords with spaces',
+      'global.subtitle': 'Search titles, questions, paragraphs, and file names across every session. Results expand as session → question → paragraph; a click opens the session at that spot.',
+      'global.building': 'Building the index…',
+      'global.ready': 'Index ready · {count} sessions',
       'global.scope.label': 'Scope',
       'global.scope.all': 'Session + question + paragraph',
       'global.scope.sessionQuestion': 'Session + question',
@@ -438,6 +442,14 @@ window.__ModuleLoader__.load({
       '.dsh-cg-state{padding:48px 12px;text-align:center;color:var(--dsw-alias-label-secondary);line-height:1.7}',
       /* The loading row keeps the spinner and its label on one optical line. */
       '.dsh-cg-state--row{display:flex;align-items:center;justify-content:center;gap:8px;line-height:1}',
+      /* First-build progress: the page swaps its whole workspace for this while it runs. */
+      '.dsh-cg-progress-block{display:flex;flex-direction:column;align-items:center;gap:10px;padding:48px 0}',
+      '.dsh-cg-progress--indeterminate .dsh-cg-progress-fill{width:35%;animation:dsh-cg-indeterminate 1.1s ease-in-out infinite}',
+      '@keyframes dsh-cg-indeterminate{0%{transform:translateX(-120%)}100%{transform:translateX(320%)}}',
+      '.dsh-cg-page{position:relative}',
+      /* Refresh keeps the old results readable under a light mask (no color-mix: older builds drop it). */
+      '.dsh-cg-mask{position:absolute;inset:110px 0 0;display:flex;align-items:center;justify-content:center;background:rgba(128,128,128,.18);z-index:5}',
+      '.dsh-cg-toast{align-self:center;margin:10px auto 0;padding:6px 12px;border-radius:999px;border:.5px solid var(--dsw-alias-state-success-primary,#2f8f4e);color:var(--dsw-alias-state-success-primary,#2f8f4e);font-size:12px}',
       '.dsh-cg-progress{display:flex;flex-direction:column;align-items:center;gap:5px;width:min(320px,70%);margin:10px auto 2px}',
       '.dsh-cg-progress-track{width:100%;height:4px;border-radius:2px;background:var(--dsw-alias-bg-layer-2);overflow:hidden}',
       '.dsh-cg-progress-fill{height:100%;border-radius:2px;background:var(--dsw-alias-brand-primary);transition:width .25s ease}',
@@ -3321,6 +3333,8 @@ window.__ModuleLoader__.load({
       /* First-build progress, polled from the Host while the corpus is still being assembled. */
       const [build, setBuild] = useState(null)
       const [indexBuilt, setIndexBuilt] = useState(null)
+      /* One-shot confirmation after the first build, then it disappears again. */
+      const [readyNotice, setReadyNotice] = useState(null)
       /* The row whose jump is in flight: it spins in place, so feedback never depends on the overlay. */
       const [pendingRow, setPendingRow] = useState('')
       useEffect(() => onOpeningChange((snapshot) => {
@@ -3339,8 +3353,8 @@ window.__ModuleLoader__.load({
         clearHighlight()
       }, [query])
 
-      /* Poll the non-blocking status while the first build runs: it answers with `done / total`
-         session counts, which is what the progress bar shows. Stops as soon as the index exists. */
+      /* Poll the non-blocking status while a build runs: it answers with `done / total` session
+         counts, which is what the progress bar shows. A manual refresh restarts the same poll. */
       useEffect(() => {
         let cancelled = false
         const controller = new AbortController()
@@ -3353,7 +3367,7 @@ window.__ModuleLoader__.load({
               setBuild(next)
               const built = typeof value.builtAt === 'number' && value.builtAt > 0
               setIndexBuilt(built)
-              if ((next !== null && next.active === true) || !built) timer = setTimeout(tick, 500)
+              if (refreshing || (next !== null && next.active === true) || !built) timer = setTimeout(tick, 500)
             },
             () => {
               /* A failed probe leaves the page on its normal states. */
@@ -3366,7 +3380,19 @@ window.__ModuleLoader__.load({
           controller.abort()
           if (timer !== null) clearTimeout(timer)
         }
-      }, [])
+      }, [refreshing])
+
+      /* One-shot "index ready" confirmation: only on the false -> true edge, never on remount. */
+      const builtBefore = useRef(null)
+      useEffect(() => {
+        const previous = builtBefore.current
+        builtBefore.current = indexBuilt
+        if (previous !== false || indexBuilt !== true) return undefined
+        const count = build !== null && typeof build.total === 'number' ? build.total : 0
+        setReadyNotice(t('global.ready', { count }))
+        const timer = setTimeout(() => setReadyNotice(null), 4000)
+        return () => clearTimeout(timer)
+      }, [indexBuilt, build, t])
 
       useEffect(() => {
         const trimmed = query.trim()
@@ -3849,6 +3875,27 @@ window.__ModuleLoader__.load({
             )
           : null
 
+      /* Building the first index replaces the whole workspace: there is nothing useful to type
+         into yet. A later refresh keeps the old results visible under a light mask instead. */
+      const building = build !== null && build.active === true
+      const firstBuild = indexBuilt !== true && (building || status === 'loading')
+      const masking = indexBuilt === true && (building || refreshing)
+      const indeterminateBar = h(
+        'div',
+        { className: 'dsh-cg-progress dsh-cg-progress--indeterminate' },
+        h('div', { className: 'dsh-cg-progress-track' }, h('div', { className: 'dsh-cg-progress-fill' })),
+      )
+      const progressBlock =
+        buildBar !== null
+          ? h('div', { className: 'dsh-cg-progress-block' }, spinner(), buildBar)
+          : h(
+              'div',
+              { className: 'dsh-cg-progress-block' },
+              spinner(),
+              indeterminateBar,
+              h('span', { className: 'dsh-cg-progress-text' }, t('global.building')),
+            )
+
       let body
       if (query.trim() === '' || status === 'idle') {
         body = h(
@@ -3904,23 +3951,20 @@ window.__ModuleLoader__.load({
       return h(
         'div',
         { className: 'dsh-cg-page' },
-        refreshing
-          ? h(
-              'div',
-              { className: 'dsh-cg-pill', role: 'status', 'aria-live': 'polite' },
-              spinner(),
-              h('div', { className: 'dsh-cg-mask-text' }, h('strong', null, t('global.refreshing'))),
-            )
-          : null,
+        readyNotice === null
+          ? null
+          : h('div', { className: 'dsh-cg-toast', role: 'status', 'aria-live': 'polite' }, readyNotice),
         h(
           'div',
           { className: 'dsh-cg-head' },
           h('h1', { className: 'dsh-cg-title' }, t('global.title'), h('span', { className: 'dsh-cg-build' }, BUILD)),
           h('p', { className: 'dsh-cg-sub' }, t('global.subtitle')),
         ),
-        h(
-          'div',
-          { className: 'dsh-cg-bar' },
+        firstBuild
+          ? null
+          : h(
+              'div',
+              { className: 'dsh-cg-bar' },
           h(
             'div',
             { className: 'dsh-cg-row' },
@@ -3936,6 +3980,7 @@ window.__ModuleLoader__.load({
                 spellCheck: false,
                 autoComplete: 'off',
                 'aria-label': t('global.placeholder'),
+                disabled: masking,
                 onChange,
                 onKeyDown,
               }),
@@ -3958,7 +4003,6 @@ window.__ModuleLoader__.load({
                     h(IconClose, null),
                   ),
             ),
-            h('button', { type: 'button', className: 'dsh-cg-submit', disabled: query.trim() === '', onClick: submit }, t('global.search')),
           ),
           h(
             'div',
@@ -4021,7 +4065,8 @@ window.__ModuleLoader__.load({
                     ),
               ),
           stats === null || sessions.length === 0 ? null : h('div', { className: 'dsh-cg-legend' }, t('global.legend')),
-          body,
+          firstBuild ? progressBlock : body,
+          masking ? h('div', { className: 'dsh-cg-mask' }, progressBlock) : null,
         ),
       )
     }
@@ -4206,7 +4251,7 @@ window.__ModuleLoader__.load({
                 name: 'sidebar.panellist',
                 id: PANEL_ID,
                 order: 5,
-                label: () => t('global.railLabel'),
+                label: () => t('global.title'),
                 locale: NS,
               },
               GlobalSearchIcon,
