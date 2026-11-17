@@ -141,8 +141,8 @@ window.__ModuleLoader__.load({
       'summary': '{turns} 组 · {matches} 条结果',
       'truncated': '结果较多，仅显示前 {count} 条',
       'history.missing': '更早的历史尚未加载，检索可能不完整',
-      'shortcut.conflict': '快捷键 {keys} 已被其它命令占用（{ids}），可能不会触发',
-      'shortcut.fallback': '默认快捷键被占用，已改用 {keys}；可在 设置 → 通用设置 → 快捷键 里改键',
+      'shortcut.conflict': '「全局搜索」的默认快捷键 {keys} 已被其它命令占用（{ids}）；可在 设置 → 通用设置 → 快捷键 里为它重新绑定',
+      'shortcut.fallback': '「全局搜索」的默认快捷键被占用，已临时改用 {keys}；可在 设置 → 通用设置 → 快捷键 里改键',
       'history.target': '正在加载到该段落 · 第 {pages} 页',
       'history.load': '加载全部',
       'history.loading': '加载中…',
@@ -248,8 +248,8 @@ window.__ModuleLoader__.load({
       'summary': '{turns} groups · {matches} matches',
       'truncated': 'Showing the first {count} matches',
       'history.missing': 'Older history is not loaded, so results may be incomplete',
-      'shortcut.conflict': 'Shortcut {keys} is already taken by {ids}; it may not fire',
-      'shortcut.fallback': 'Default shortcut was taken; using {keys}. Rebind it in Settings → General → Shortcuts.',
+      'shortcut.conflict': 'The default shortcut for "Global search", {keys}, is already used by {ids}; rebind it in Settings → General → Shortcuts',
+      'shortcut.fallback': 'The default shortcut for "Global search" was taken; using {keys} for now. Rebind it in Settings → General → Shortcuts.',
       'history.target': 'Loading up to that paragraph · page {pages}',
       'history.load': 'Load all',
       'history.loading': 'Loading…',
@@ -2199,39 +2199,63 @@ window.__ModuleLoader__.load({
         ]
         for (const command of commands) {
           const isGlobal = command.id.endsWith('.global')
-          const candidates = isGlobal ? GLOBAL_CANDIDATES : [{ code: 'KeyF', modifiers: ['primary'] }]
+          const preferred = isGlobal ? GLOBAL_CANDIDATES[0] : { code: 'KeyF', modifiers: ['primary'] }
+          /* An owned default is not something this plugin should silently move away from: omit the
+             default (the command stays registered and bindable) and say who holds the key. */
+          const conflicts = isGlobal ? bindingConflicts(shortcuts, preferred) : []
+          const defaults =
+            conflicts.length === 0
+              ? { 'desktop:macos': preferred, 'desktop:windows': preferred, 'desktop:linux': preferred }
+              : {}
           let registered = false
-          for (const binding of candidates) {
-            try {
-              const dispose = shortcuts.register({
-                id: command.id,
-                label: command.label,
-                aliases: command.aliases,
-                defaults: {
-                  'desktop:macos': binding,
-                  'desktop:windows': binding,
-                  'desktop:linux': binding,
-                },
-                regions: ['page', 'editable'],
-                modals: [],
-                resolve: () => ({ status: 'handled', run: command.run }),
-              })
-              if (typeof dispose === 'function') disposeList.push(dispose)
-              if (isGlobal) {
-                globalBinding = binding
-                if (binding !== GLOBAL_CANDIDATES[0]) {
-                  shortcutNotice = {
-                    id: command.id,
-                    keys: describeBindingKeys(shortcuts, binding),
-                    ids: [],
-                    fallback: true,
-                  }
+          try {
+            const dispose = shortcuts.register({
+              id: command.id,
+              label: command.label,
+              aliases: command.aliases,
+              defaults,
+              regions: ['page', 'editable'],
+              modals: [],
+              resolve: () => ({ status: 'handled', run: command.run }),
+            })
+            if (typeof dispose === 'function') disposeList.push(dispose)
+            if (isGlobal) {
+              globalBinding = preferred
+              if (conflicts.length > 0) {
+                shortcutNotice = {
+                  id: command.id,
+                  keys: formatShortcut(preferred, shortcuts.platform),
+                  ids: conflicts,
+                  conflict: true,
                 }
+                console.warn('[conversation-search] global shortcut already owned:', shortcutNotice.keys, '->', conflicts.join(', '))
               }
-              registered = true
-              break
-            } catch (error) {
-              debugLog('shortcut registry refused the binding', { id: command.id, code: binding.code, message: String(error && error.message) })
+            }
+            registered = true
+          } catch (error) {
+            debugLog('shortcut registry refused the binding', { id: command.id, code: preferred.code, message: String(error && error.message) })
+          }
+          if (!registered && isGlobal) {
+            /* Last resort, only if even the unbound registration failed: keep it usable somewhere. */
+            for (const binding of GLOBAL_CANDIDATES.slice(1)) {
+              try {
+                const dispose = shortcuts.register({
+                  id: command.id,
+                  label: command.label,
+                  aliases: command.aliases,
+                  defaults: { 'desktop:macos': binding, 'desktop:windows': binding, 'desktop:linux': binding },
+                  regions: ['page', 'editable'],
+                  modals: [],
+                  resolve: () => ({ status: 'handled', run: command.run }),
+                })
+                if (typeof dispose === 'function') disposeList.push(dispose)
+                globalBinding = binding
+                shortcutNotice = { id: command.id, keys: formatShortcut(binding, shortcuts.platform), ids: [], fallback: true }
+                registered = true
+                break
+              } catch (error) {
+                debugLog('shortcut fallback refused', { code: binding.code, message: String(error && error.message) })
+              }
             }
           }
           if (!registered) debugLog('shortcut command could not be registered', { id: command.id })
@@ -2257,9 +2281,8 @@ window.__ModuleLoader__.load({
     /** The combo the registry accepted for the global page; the page-level fallback follows it. */
     let globalBinding = { code: 'KeyQ', modifiers: ['primary', 'alt'] }
 
-    /* The registry throws when a default overlaps another command, and a throw would drop the whole
-       command from Settings. Try a few free combos instead: the first accepted one becomes the
-       default, so the command is always visible and rebindable. */
+    /* The preferred default comes first. The rest are only a last resort, used when even an unbound
+       registration is refused; the plugin prefers to yield the key (and say so) over moving itself. */
     const GLOBAL_CANDIDATES = [
       { code: 'KeyQ', modifiers: ['primary', 'alt'] },
       { code: 'Digit1', modifiers: ['primary', 'alt'] },
@@ -2267,19 +2290,34 @@ window.__ModuleLoader__.load({
       { code: 'KeyJ', modifiers: ['primary', 'alt'] },
     ]
 
-    /** Human-readable keys for a binding, preferring the registry's own rendering. */
-    function describeBindingKeys(shortcuts, binding) {
+    /** Which commands already own a combo, according to the registry. */
+    function bindingConflicts(shortcuts, binding) {
       try {
         if (shortcuts !== undefined && shortcuts !== null && typeof shortcuts.describeBinding === 'function') {
           const described = shortcuts.describeBinding(binding)
-          if (described !== null && described !== undefined && typeof described.keys === 'string' && described.keys !== '') {
-            return described.keys
-          }
+          if (described !== null && described !== undefined && Array.isArray(described.conflicts)) return described.conflicts
         }
       } catch (error) {
-        /* Fall through to the local rendering. */
+        /* A registry without the probe simply reports no conflict. */
       }
-      return binding.modifiers.concat(binding.code).join('+')
+      return []
+    }
+
+    /** Platform-native key label: Ctrl+Alt+1 on Windows/Linux, Cmd+Option+1 on macOS. */
+    function formatShortcut(binding, platform) {
+      const mac = platform === 'macos'
+      const names = {
+        primary: mac ? 'Cmd' : 'Ctrl',
+        control: 'Ctrl',
+        alt: mac ? 'Option' : 'Alt',
+        shift: 'Shift',
+        meta: mac ? 'Cmd' : 'Win',
+      }
+      const parts = binding.modifiers.map((modifier) => names[modifier] || modifier)
+      const code = binding.code
+      const key = code.startsWith('Key') ? code.slice(3) : code.startsWith('Digit') ? code.slice(5) : code
+      parts.push(key)
+      return parts.join('+')
     }
 
     /** Page-level bindings: Ctrl/Cmd+F opens the panel, Ctrl/Cmd+Alt+Q the global page. */

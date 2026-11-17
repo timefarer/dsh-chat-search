@@ -213,8 +213,8 @@ const zh = {
   'truncated': '仅显示前 {count} 条',
   'history.missing': '更早的历史尚未加载',
   'history.target': '正在加载到该段落 · 第 {pages} 页',
-  'shortcut.conflict': '快捷键 {keys} 已被其它命令占用（{ids}），可能不会触发',
-  'shortcut.fallback': '默认快捷键被占用，已改用 {keys}；可在 设置 → 通用设置 → 快捷键 里改键',
+  'shortcut.conflict': '「全局搜索」的默认快捷键 {keys} 已被其它命令占用（{ids}）；可在 设置 → 通用设置 → 快捷键 里为它重新绑定',
+  'shortcut.fallback': '「全局搜索」的默认快捷键被占用，已临时改用 {keys}；可在 设置 → 通用设置 → 快捷键 里改键',
   'history.load': '加载全部',
   'history.loading': '加载中…',
   'history.failed': '无法加载',
@@ -325,16 +325,20 @@ const services = {
   },
   layout: { selectPanel() {} },
   shortcuts: {
-    /* Simulates another command already owning Ctrl+Alt+Q: the registry throws on an overlapping
-       default, so the plugin must retry with the next candidate instead of dropping the command. */
+    /* Simulates another command already owning Ctrl+Alt+Q. The plugin must not silently move away:
+       it registers the command unbound and reports the key as taken. */
+    platform: 'windows',
     register(definition) {
       const binding = definition.defaults === undefined ? null : definition.defaults['desktop:windows']
-      if (binding !== null && binding.code === 'KeyQ') throw new Error('overlapping default binding')
+      if (binding !== null && binding !== undefined && binding.code === 'KeyQ') throw new Error('overlapping default binding')
       shortcutDefinitions.push(definition)
       return () => {}
     },
-    describeBinding() {
-      return { keys: 'Ctrl+Alt+Digit1', conflicts: [], issue: undefined }
+    describeBinding(binding) {
+      if (binding !== null && binding !== undefined && binding.code === 'KeyQ') {
+        return { keys: 'Ctrl+Alt+Q', conflicts: ['another-plugin.split-session'], issue: undefined }
+      }
+      return { keys: 'Ctrl+F', conflicts: [], issue: undefined }
     },
   },
 }
@@ -613,7 +617,11 @@ check('assistant role label', panelText.includes('回复'))
 check('user role label', panelText.includes('提问'))
 check('unrelated paragraph excluded', !panelText.includes('这一段落与搜索词无关'))
 /* The registry reported another owner for Ctrl+Alt+Q: the panel must say so instead of looking broken. */
-check('shortcut fallback is surfaced in the panel', panelText.includes('默认快捷键被占用'), panelText.slice(0, 260))
+check(
+  'shortcut conflict names the command and the native keys',
+  panelText.includes('「全局搜索」') && panelText.includes('Ctrl+Alt+Q') && panelText.includes('another-plugin.split-session'),
+  panelText.slice(0, 300),
+)
 
 /* The second reply message of Turn 1: paragraph numbers continue across messages, and the file
    row of the first message must not consume a number (the Host numbers paragraphs the same way). */
@@ -831,18 +839,14 @@ check('find shortcut resolves as handled', resolution !== null && resolution.sta
 if (resolution !== null && resolution.status === 'handled') resolution.run()
 check('find shortcut opens the search tab', openedTabs.includes('conversation-search'), JSON.stringify(openedTabs))
 
-/* The global page falls back through the candidate list: Ctrl+Alt+Q is taken in this mock, so the
-   registry must accept the next free combo instead of dropping the command entirely. */
+/* Ctrl+Alt+Q is taken in this mock. The plugin must NOT move itself to another key: it registers
+   the command with no default (still listed and bindable) and reports who owns the combo. */
 const globalDefinition = shortcutDefinitions.find((definition) => definition.id === 'conversation-search.global')
 check('global shortcut registered', globalDefinition !== undefined, JSON.stringify(shortcutDefinitions.map((d) => d.id)))
 check(
-  'global shortcut falls back to a free combo',
-  globalDefinition !== undefined &&
-    globalDefinition.defaults['desktop:windows'].code === 'Digit1' &&
-    globalDefinition.defaults['desktop:windows'].modifiers.includes('primary') &&
-    globalDefinition.defaults['desktop:windows'].modifiers.includes('alt') &&
-    !globalDefinition.defaults['desktop:windows'].modifiers.includes('shift'),
-  globalDefinition === undefined ? 'no definition' : JSON.stringify(globalDefinition.defaults['desktop:windows']),
+  'an owned default leaves the command unbound',
+  globalDefinition !== undefined && Object.keys(globalDefinition.defaults).length === 0,
+  globalDefinition === undefined ? 'no definition' : JSON.stringify(globalDefinition.defaults),
 )
 check(
   'global shortcut declares no web default',
