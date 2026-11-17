@@ -373,7 +373,11 @@ window.__ModuleLoader__.load({
       '.dsh-csearch-snippet mark{padding:0 1px;border-radius:2px;background:rgba(255,199,0,.45);color:inherit}',
       '.dsh-csearch-summary{padding:2px 8px 6px;color:var(--dsw-alias-label-secondary);font-size:11px}',
       '.dsh-cg-page{display:flex;flex-direction:column;flex:1 1 auto;height:100%;min-height:0;overflow:hidden;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);font-size:var(--dsh-content-font-size-secondary,13px)}',
-      '.dsh-cg-head{flex:none;width:100%;max-width:1080px;margin:0 auto;padding:28px 32px 0;box-sizing:border-box}',
+      '.dsh-cg-head{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;flex:none;width:100%;max-width:1080px;margin:0 auto;padding:28px 32px 0;box-sizing:border-box}',
+      '.dsh-cg-head-text{min-width:0}',
+      '.dsh-cg-head-progress{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex:none;width:min(260px,32%);padding-top:2px}',
+      '.dsh-cg-head-progress .dsh-cg-progress{margin:0;width:100%;align-items:flex-end}',
+      '.dsh-cg-head-progress .dsh-cg-progress-track{width:100%}',
       '.dsh-cg-title{margin:0;font-size:calc(var(--dsh-content-font-size,14px) + 7px);font-weight:600;line-height:1.3}',
       '.dsh-cg-sub{margin:8px 0 0;color:var(--dsw-alias-label-secondary);line-height:1.6}',
       '.dsh-cg-bar{flex:none;display:flex;flex-direction:column;gap:10px;width:100%;max-width:1080px;margin:0 auto;padding:16px 32px 12px;box-sizing:border-box;border-bottom:.5px solid var(--dsw-alias-border-l1)}',
@@ -447,8 +451,6 @@ window.__ModuleLoader__.load({
       '.dsh-cg-progress--indeterminate .dsh-cg-progress-fill{width:35%;animation:dsh-cg-indeterminate 1.1s ease-in-out infinite}',
       '@keyframes dsh-cg-indeterminate{0%{transform:translateX(-120%)}100%{transform:translateX(320%)}}',
       '.dsh-cg-page{position:relative}',
-      /* Refresh keeps the old results readable under a light mask (no color-mix: older builds drop it). */
-      '.dsh-cg-mask{position:absolute;inset:110px 0 0;display:flex;align-items:center;justify-content:center;background:rgba(128,128,128,.18);z-index:5}',
       '.dsh-cg-toast{align-self:center;margin:10px auto 0;padding:6px 12px;border-radius:999px;border:.5px solid var(--dsw-alias-state-success-primary,#2f8f4e);color:var(--dsw-alias-state-success-primary,#2f8f4e);font-size:12px}',
       '.dsh-cg-progress{display:flex;flex-direction:column;align-items:center;gap:5px;width:min(320px,70%);margin:10px auto 2px}',
       '.dsh-cg-progress-track{width:100%;height:4px;border-radius:2px;background:var(--dsw-alias-bg-layer-2);overflow:hidden}',
@@ -3876,10 +3878,13 @@ window.__ModuleLoader__.load({
           : null
 
       /* Building the first index replaces the whole workspace: there is nothing useful to type
-         into yet. A later refresh keeps the old results visible under a light mask instead. */
+         into yet. A refresh keeps the results in place and only borrows the header for progress. */
       const building = build !== null && build.active === true
-      const firstBuild = indexBuilt !== true && (building || status === 'loading')
-      const masking = indexBuilt === true && (building || refreshing)
+      /* Before the first status answer we do not know whether an index exists, so start in the
+         building shape instead of flashing the idle page (and its hint) for one frame. */
+      const indexUnknown = indexBuilt === null && build === null
+      const firstBuild = indexUnknown || (indexBuilt !== true && (building || status === 'loading'))
+      const refreshingNow = indexBuilt === true && (building || refreshing)
       const indeterminateBar = h(
         'div',
         { className: 'dsh-cg-progress dsh-cg-progress--indeterminate' },
@@ -3902,7 +3907,6 @@ window.__ModuleLoader__.load({
           'div',
           { className: 'dsh-cg-state' },
           h('strong', null, t('global.idle')),
-          indexBuilt === true ? null : h('span', null, t('global.firstIndex')),
           buildBar,
           recent.length === 0
             ? null
@@ -3957,8 +3961,23 @@ window.__ModuleLoader__.load({
         h(
           'div',
           { className: 'dsh-cg-head' },
-          h('h1', { className: 'dsh-cg-title' }, t('global.title'), h('span', { className: 'dsh-cg-build' }, BUILD)),
-          h('p', { className: 'dsh-cg-sub' }, t('global.subtitle')),
+          h(
+            'div',
+            { className: 'dsh-cg-head-text' },
+            h('h1', { className: 'dsh-cg-title' }, t('global.title'), h('span', { className: 'dsh-cg-build' }, BUILD)),
+            h('p', { className: 'dsh-cg-sub' }, t('global.subtitle')),
+          ),
+          /* Refresh borrows the header instead of covering the results: the numbers stay visible. */
+          refreshingNow
+            ? h(
+                'div',
+                { className: 'dsh-cg-head-progress', role: 'status', 'aria-live': 'polite' },
+                spinner('sm'),
+                buildBar !== null
+                  ? buildBar
+                  : h('span', { className: 'dsh-cg-progress-text' }, t('global.building')),
+              )
+            : null,
         ),
         firstBuild
           ? null
@@ -3980,7 +3999,7 @@ window.__ModuleLoader__.load({
                 spellCheck: false,
                 autoComplete: 'off',
                 'aria-label': t('global.placeholder'),
-                disabled: masking,
+                disabled: refreshingNow,
                 onChange,
                 onKeyDown,
               }),
@@ -4059,14 +4078,15 @@ window.__ModuleLoader__.load({
                   : h(
                       'span',
                       { className: 'dsh-cg-stats-actions' },
-                      h('button', { type: 'button', className: 'dsh-cg-link', onClick: refresh }, t('global.refresh')),
+                      refreshingNow
+                        ? null
+                        : h('button', { type: 'button', className: 'dsh-cg-link', onClick: refresh }, t('global.refresh')),
                       h('button', { type: 'button', className: 'dsh-cg-link', onClick: expandAll }, t('expandAll')),
                       h('button', { type: 'button', className: 'dsh-cg-link', onClick: collapseAll }, t('collapseAll')),
                     ),
               ),
           stats === null || sessions.length === 0 ? null : h('div', { className: 'dsh-cg-legend' }, t('global.legend')),
           firstBuild ? progressBlock : body,
-          masking ? h('div', { className: 'dsh-cg-mask' }, progressBlock) : null,
         ),
       )
     }
