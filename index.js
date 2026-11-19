@@ -510,6 +510,17 @@ function createIndex(ctx) {
     if (query === undefined) throw new Error('sessionQuery is unavailable')
     const liveSessions = ctx.get('sessions')
     const records = await query.listSessions()
+    /* A conversation that just started may not be on disk yet, so `listSessions()` misses it while
+       its events are already live. Add those sessions so searching during a fresh chat works. */
+    const liveList =
+      liveSessions !== undefined && liveSessions !== null && typeof liveSessions.list === 'function' ? liveSessions.list() : []
+    const knownIds = new Set(records.map((record) => record.header.id))
+    for (const session of liveList) {
+      if (knownIds.has(session.id)) continue
+      if (typeof session.snapshotEvents !== 'function') continue
+      records.push({ header: { id: session.id, title: '' } })
+      knownIds.add(session.id)
+    }
     progress = { active: true, done: 0, total: Math.min(records.length, MAX_SESSIONS) }
     const next = new Map()
     let budget = MAX_TOTAL_CHARS

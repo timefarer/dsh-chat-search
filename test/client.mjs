@@ -484,6 +484,21 @@ function findAll(node, className, out = []) {
   return out
 }
 
+/** Every node whose className list contains this class (stateful variants add a second class). */
+function findAllInClass(node, className, out = []) {
+  if (node === null || node === undefined || node === false) return out
+  if (Array.isArray(node)) {
+    for (const child of node) findAllInClass(child, className, out)
+    return out
+  }
+  if (typeof node !== 'object') return out
+  if (node.props && typeof node.props.className === 'string' && node.props.className.split(/\s+/).includes(className)) {
+    out.push(node)
+  }
+  if (node.props && node.props.children !== undefined) findAllInClass(node.props.children, className, out)
+  return out
+}
+
 const flatten = (node, out = []) => {
   if (node === null || node === undefined || node === false) return out
   if (typeof node === 'string' || typeof node === 'number') {
@@ -927,22 +942,42 @@ check('the panel summarises the window', panelOldText.includes('最近 30 轮'),
 /* Open the editor, clear both dates and the turn count: the old Turn must come back. */
 if (panelToggle !== null) panelToggle.props.onClick()
 panelOldTree = await settle('panel-old', bodyRegistration.Component, panelOldProps)
-check('opening the filter reveals the fields', findAll(panelOldTree, 'dsh-filter-input').length === 2, String(findAll(panelOldTree, 'dsh-filter-input').length))
-check('the turn count field is present', findNode(panelOldTree, 'dsh-filter-input dsh-filter-number') !== null)
+const dateInputs = () => findAllInClass(panelOldTree, 'dsh-filter-input').filter((node) => node.props.type === 'date')
+check('opening the filter reveals the fields', dateInputs().length === 2, String(dateInputs().length))
+check('the turn count field is present', findAllInClass(panelOldTree, 'dsh-filter-input').some((node) => node.props.type === 'number'))
 
-let dateFields = findAll(panelOldTree, 'dsh-filter-input')
+let dateFields = dateInputs()
 if (dateFields.length === 2) {
   dateFields[0].props.onChange({ target: { value: '' } })
   panelOldTree = await settle('panel-old', bodyRegistration.Component, panelOldProps)
-  dateFields = findAll(panelOldTree, 'dsh-filter-input')
+  dateFields = dateInputs()
   dateFields[1].props.onChange({ target: { value: '' } })
   panelOldTree = await settle('panel-old', bodyRegistration.Component, panelOldProps)
-  const numberField = findNode(panelOldTree, 'dsh-filter-input dsh-filter-number')
+  const numberField = findAllInClass(panelOldTree, 'dsh-filter-input').find((node) => node.props.type === 'number') || null
   if (numberField !== null) numberField.props.onChange({ target: { value: '' } })
   panelOldTree = await settle('panel-old', bodyRegistration.Component, panelOldProps)
 }
 const clearedText = flatten(panelOldTree).join('|')
 check('clearing the window exposes the old Turn', clearedText.replace(/\|/g, '').includes('远古标记的回复内容'), clearedText.slice(0, 400))
+
+/* Changed values are marked blue and only then does the reset become clickable. */
+let freshFilterTree = await settle('panel-filters', bodyRegistration.Component, panelProps)
+const freshToggle = findNode(freshFilterTree, 'dsh-filter-toggle')
+if (freshToggle !== null) freshToggle.props.onClick()
+freshFilterTree = await settle('panel-filters', bodyRegistration.Component, panelProps)
+const freshReset = findNode(freshFilterTree, 'dsh-filter-reset')
+check('reset is disabled while the window is untouched', freshReset !== null && freshReset.props.disabled === true, freshReset === null ? 'no reset' : String(freshReset.props.disabled))
+const freshDate = findAllInClass(freshFilterTree, 'dsh-filter-input').find((node) => node.props.type === 'date') || null
+if (freshDate !== null) freshDate.props.onChange({ target: { value: '2026-01-01' } })
+const changedFilterTree = await settle('panel-filters', bodyRegistration.Component, panelProps)
+const changedDates = findAllInClass(changedFilterTree, 'dsh-filter-input').filter((node) => node.props.type === 'date')
+check(
+  'a changed date is marked as modified',
+  changedDates.some((node) => String(node.props.className).includes('dsh-filter-input--modified')),
+  changedDates.map((node) => node.props.className).join(' / '),
+)
+const changedReset = findNode(changedFilterTree, 'dsh-filter-reset')
+check('reset becomes clickable after a change', changedReset !== null && changedReset.props.disabled === false, changedReset === null ? 'no reset' : String(changedReset.props.disabled))
 
 const pageFilterBar = findNode(pageTree, 'dsh-filters')
 check('the page shows the filter bar', pageFilterBar !== null, flatten(pageTree).join('|').slice(0, 300))

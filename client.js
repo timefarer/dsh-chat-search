@@ -471,10 +471,15 @@ window.__ModuleLoader__.load({
       '.dsh-filter-label{color:var(--dsw-alias-label-secondary);font-size:11px}',
       '.dsh-filter-input{height:26px;padding:0 6px;border:.5px solid var(--dsw-alias-border-l1);border-radius:7px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font:inherit;font-size:12px}',
       '.dsh-filter-input:focus{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-1px}',
+      /* A value the reader changed is blue, so a stale date cannot hide in plain sight. */
+      '.dsh-filter-input--modified{color:var(--dsw-alias-brand-primary);border-color:var(--dsw-alias-brand-primary)}',
       '.dsh-filter-number{width:64px}',
       '.dsh-filter-dash{color:var(--dsw-alias-label-secondary)}',
       '.dsh-filter-reset{height:26px;padding:0 8px;border:.5px solid transparent;border-radius:7px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:12px;cursor:pointer}',
-      '.dsh-filter-reset:hover{border-color:var(--dsw-alias-border-l1);color:var(--dsw-alias-label-primary)}',
+      '.dsh-filter-reset:hover:not(:disabled){border-color:var(--dsw-alias-border-l1);color:var(--dsw-alias-label-primary)}',
+      /* The reset is only meaningful once something differs from the default window. */
+      '.dsh-filter-reset:disabled{opacity:.45;cursor:default}',
+      '.dsh-filter-reset:not(:disabled){color:var(--dsw-alias-brand-primary)}',
       '.dsh-filters-compact{flex-direction:column;align-items:stretch;gap:6px}',
       '.dsh-filter-toggle{display:flex;align-items:center;gap:6px;width:100%;padding:4px 6px;border:0;border-radius:7px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:11px;text-align:left;cursor:pointer}',
       '.dsh-filter-toggle:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}',
@@ -1269,6 +1274,28 @@ window.__ModuleLoader__.load({
       return visible
     }
 
+    /** Rows that exist in the DOM even when collapsed (zero height) — for reveal-then-jump. */
+    function allRowsOf(nodeKey) {
+      try {
+        return Array.prototype.slice.call(document.querySelectorAll('[data-chat-node-key="' + escapeAttribute(nodeKey) + '"]'))
+      } catch (error) {
+        return []
+      }
+    }
+
+    /** Open the nearest collapsed <details> around a row; the host folds long steps that way. */
+    function revealRow(row) {
+      let node = row
+      while (node !== null && node !== undefined && node !== document.body) {
+        if (node.tagName === 'DETAILS' && node.open === false) {
+          node.open = true
+          return true
+        }
+        node = node.parentElement
+      }
+      return false
+    }
+
     /** The nearest ancestor that actually scrolls, so the page itself never moves. */
     function scrollerOf(element) {
       let node = element.parentElement
@@ -1985,12 +2012,27 @@ window.__ModuleLoader__.load({
     }
 
     /** Scroll the conversation to one message, mark the paragraph and the matched words. */
-    function jumpToNode(nodeKey, words, anchor) {
-      const rows = rowsOf(nodeKey)
-      const row = rows[0]
+    function jumpToNode(nodeKey, words, anchor, retried) {
+      let row = rowsOf(nodeKey)[0]
       if (row === undefined) {
-        debugLog('jump: row not rendered', nodeKey)
-        return false
+        /* A collapsed fold leaves the row in the DOM but zero-height. Open it, then retry once:
+           "clicked a result and nothing happened" is almost always this case mid-conversation. */
+        const hidden = allRowsOf(nodeKey)[0]
+        if (hidden !== undefined && retried !== true && revealRow(hidden)) {
+          try {
+            hidden.scrollIntoView({ block: 'center', behavior: 'auto' })
+          } catch (error) {
+            /* The retry below still measures the row. */
+          }
+          setTimeout(() => jumpToNode(nodeKey, words, anchor, true), 80)
+          return true
+        }
+        if (hidden === undefined) {
+          debugLog('jump: row not rendered', nodeKey)
+          return false
+        }
+        /* Last resort: paint on the hidden row; scrollIntoView still brings it into view. */
+        row = hidden
       }
       lastPaint = { key: nodeKey, ranges: scrollAndPaint(row, words, anchor), anchor }
       /* Click (or panel pick) to a visible landing marker: the number performance work must move. */
@@ -2777,6 +2819,11 @@ window.__ModuleLoader__.load({
       /* Any hand edit turns the window from "last 14 days" into a fixed range: it stops following
          today, which is what the reader asked for by typing dates. */
       const update = (patch) => onChange({ ...value, ...patch, rolling: false, savedOn: '' })
+      /* Compare against the window the control would show untouched, so each changed value can be
+         marked separately and the reset can stay disabled while nothing changed. */
+      const defaults = defaultFilters()
+      const modified = value.since !== defaults.since || value.until !== defaults.until || value.turns !== defaults.turns
+      const fieldClass = (changed) => (changed ? 'dsh-filter-input dsh-filter-input--modified' : 'dsh-filter-input')
       return h(
         'div',
         { className: 'dsh-filter-body' },
@@ -2786,7 +2833,7 @@ window.__ModuleLoader__.load({
           h('span', { className: 'dsh-filter-label' }, t('filters.since')),
           h('input', {
             type: 'date',
-            className: 'dsh-filter-input',
+            className: fieldClass(value.since !== defaults.since),
             value: value.since,
             'aria-label': t('filters.since'),
             onChange: (event) => update({ since: event.target.value }),
@@ -2799,7 +2846,7 @@ window.__ModuleLoader__.load({
           h('span', { className: 'dsh-filter-label' }, t('filters.until')),
           h('input', {
             type: 'date',
-            className: 'dsh-filter-input',
+            className: fieldClass(value.until !== defaults.until),
             value: value.until,
             'aria-label': t('filters.until'),
             onChange: (event) => update({ until: event.target.value }),
@@ -2813,7 +2860,7 @@ window.__ModuleLoader__.load({
             type: 'number',
             min: 0,
             step: 1,
-            className: 'dsh-filter-input dsh-filter-number',
+            className: fieldClass(value.turns !== defaults.turns) + ' dsh-filter-number',
             value: value.turns === 0 ? '' : String(value.turns),
             placeholder: t('filters.unlimited'),
             'aria-label': t('filters.turns'),
@@ -2823,7 +2870,12 @@ window.__ModuleLoader__.load({
         ),
         h(
           'button',
-          { type: 'button', className: 'dsh-filter-reset', onClick: () => onChange(defaultFilters()) },
+          {
+            type: 'button',
+            className: 'dsh-filter-reset',
+            disabled: !modified,
+            onClick: () => onChange(defaultFilters()),
+          },
           t('filters.reset'),
         ),
       )
