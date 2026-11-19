@@ -225,6 +225,7 @@ window.__ModuleLoader__.load({
       'filters.turns': '最近轮次',
       'filters.unlimited': '不限',
       'filters.reset': '重置',
+      'filters.modified': '已自定义',
       'filters.summary.range': '{since} ~ {until}',
       'filters.summary.turns': '最近 {count} 轮',
       'filters.summary.all': '全部范围',
@@ -330,6 +331,7 @@ window.__ModuleLoader__.load({
       'filters.turns': 'Last turns',
       'filters.unlimited': 'Unlimited',
       'filters.reset': 'Reset',
+      'filters.modified': 'Custom',
       'filters.summary.range': '{since} ~ {until}',
       'filters.summary.turns': 'last {count} turns',
       'filters.summary.all': 'All',
@@ -344,8 +346,8 @@ window.__ModuleLoader__.load({
       '.dsh-csearch-title svg{width:13px;height:13px;flex:none;color:var(--dsw-alias-label-secondary)}',
       '.dsh-csearch-root{display:flex;flex-direction:column;min-height:0;height:100%;font-size:var(--dsh-content-font-size-secondary,13px);color:var(--dsw-alias-label-primary)}',
       '.dsh-csearch-head{flex:none;display:flex;flex-direction:column;gap:8px;padding:12px 12px 10px;border-bottom:.5px solid var(--dsw-alias-border-l1)}',
-      '.dsh-csearch-field{display:flex;align-items:center;gap:6px;height:34px;padding:0 6px 0 10px;border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-md,10px);background:var(--dsw-alias-bg-layer-2)}',
-      '.dsh-csearch-field:focus-within{border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 2px rgba(74,144,255,.18)}',
+      '.dsh-csearch-field{display:flex;align-items:center;gap:6px;height:34px;padding:0 6px 0 10px;border:1px solid var(--dsw-alias-border-l1);border-radius:var(--dsw-radius-md,10px);background:var(--dsw-alias-bg-layer-1)}',
+      '.dsh-csearch-field:focus-within{border-color:var(--dsw-alias-brand-primary)}',
       '.dsh-csearch-field>svg{width:14px;height:14px;flex:none;color:var(--dsw-alias-label-secondary)}',
       '.dsh-csearch-input{flex:1;min-width:0;height:100%;border:0;outline:0;background:transparent;color:var(--dsw-alias-label-primary);font:inherit;font-size:var(--dsh-content-font-size,14px)}',
       '.dsh-csearch-input::placeholder{color:var(--dsw-alias-label-secondary)}',
@@ -382,8 +384,8 @@ window.__ModuleLoader__.load({
       '.dsh-cg-sub{margin:8px 0 0;color:var(--dsw-alias-label-secondary);line-height:1.6}',
       '.dsh-cg-bar{flex:none;display:flex;flex-direction:column;gap:10px;width:100%;max-width:1080px;margin:0 auto;padding:16px 32px 12px;box-sizing:border-box;border-bottom:.5px solid var(--dsw-alias-border-l1)}',
       '.dsh-cg-row{display:flex;align-items:center;gap:8px}',
-      '.dsh-cg-field{display:flex;align-items:center;gap:8px;flex:1;min-width:0;height:38px;padding:0 10px 0 12px;border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-md,10px);background:var(--dsw-alias-bg-layer-2)}',
-      '.dsh-cg-field:focus-within{border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 2px rgba(74,144,255,.18)}',
+      '.dsh-cg-field{display:flex;align-items:center;gap:8px;flex:1;min-width:0;height:38px;padding:0 10px 0 12px;border:1px solid var(--dsw-alias-border-l1);border-radius:var(--dsw-radius-md,10px);background:var(--dsw-alias-bg-layer-1)}',
+      '.dsh-cg-field:focus-within{border-color:var(--dsw-alias-brand-primary)}',
       '.dsh-cg-field>svg{width:16px;height:16px;flex:none;color:var(--dsw-alias-label-secondary)}',
       '.dsh-cg-clear{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;padding:0;border:0;border-radius:50%;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;flex:none}',
       '.dsh-cg-clear:hover{background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary)}',
@@ -470,9 +472,10 @@ window.__ModuleLoader__.load({
       '.dsh-filter-field{display:flex;align-items:center;gap:4px}',
       '.dsh-filter-label{color:var(--dsw-alias-label-secondary);font-size:11px}',
       '.dsh-filter-input{height:26px;padding:0 6px;border:.5px solid var(--dsw-alias-border-l1);border-radius:7px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font:inherit;font-size:12px}',
-      '.dsh-filter-input:focus{border-color:var(--dsw-alias-brand-primary);outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-1px}',
+      '.dsh-filter-input:focus{border-color:var(--dsw-alias-brand-primary);outline:0}',
       /* A value the reader changed is blue, so a stale date cannot hide in plain sight. */
       '.dsh-filter-input--modified{color:var(--dsw-alias-brand-primary);border-color:var(--dsw-alias-brand-primary)}',
+      '.dsh-filter-badge{display:inline-flex;align-items:center;height:18px;padding:0 6px;border-radius:999px;background:rgba(74,144,255,.12);color:var(--dsw-alias-brand-primary);font-size:11px;line-height:1}',
       '.dsh-filter-number{width:64px}',
       '.dsh-filter-dash{color:var(--dsw-alias-label-secondary)}',
       '.dsh-filter-reset{height:26px;padding:0 8px;border:.5px solid transparent;border-radius:7px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:12px;cursor:pointer}',
@@ -2807,6 +2810,12 @@ window.__ModuleLoader__.load({
 
     // #region Components
 
+    /** Whether the window differs from the default "last 14 days / 30 turns" one. */
+    function filtersModified(value) {
+      const defaults = defaultFilters()
+      return value.since !== defaults.since || value.until !== defaults.until || value.turns !== defaults.turns
+    }
+
     /**
      * The date-range and turn-count inputs, shared by the page and the panel.
      *
@@ -2819,7 +2828,7 @@ window.__ModuleLoader__.load({
       /* Compare against the window the control would show untouched, so each changed value can be
          marked separately and the reset can stay disabled while nothing changed. */
       const defaults = defaultFilters()
-      const modified = value.since !== defaults.since || value.until !== defaults.until || value.turns !== defaults.turns
+      const modified = filtersModified(value)
       const fieldClass = (changed) => (changed ? 'dsh-filter-input dsh-filter-input--modified' : 'dsh-filter-input')
       return h(
         'div',
@@ -2884,6 +2893,7 @@ window.__ModuleLoader__.load({
         'div',
         { className: 'dsh-filters' },
         h('span', { className: 'dsh-filter-title' }, t('filters.label')),
+        filtersModified(value) ? h('span', { className: 'dsh-filter-badge' }, t('filters.modified')) : null,
         filterFields(t, value, onChange),
       )
     }
@@ -2894,6 +2904,7 @@ window.__ModuleLoader__.load({
         'div',
         { className: 'dsh-filters dsh-filters-compact' },
         h('span', { className: 'dsh-filter-title' }, t('filters.label')),
+        filtersModified(value) ? h('span', { className: 'dsh-filter-badge' }, t('filters.modified')) : null,
         filterFields(t, value, onChange),
       )
     }

@@ -253,6 +253,7 @@ const zh = {
   'filters.turns': '最近轮次',
   'filters.unlimited': '不限',
   'filters.reset': '重置',
+  'filters.modified': '已自定义',
   'filters.summary.range': '{since} ~ {until}',
   'filters.summary.turns': '最近 {count} 轮',
   'filters.summary.all': '全部范围',
@@ -975,6 +976,7 @@ check(
 )
 const changedReset = findNode(changedFilterTree, 'dsh-filter-reset')
 check('reset becomes clickable after a change', changedReset !== null && changedReset.props.disabled === false, changedReset === null ? 'no reset' : String(changedReset.props.disabled))
+check('a changed window is labelled', flatten(changedFilterTree).join('|').includes('已自定义'), flatten(changedFilterTree).join('|').slice(0, 220))
 
 const pageFilterBar = findNode(pageTree, 'dsh-filters')
 check('the page shows the filter bar', pageFilterBar !== null, flatten(pageTree).join('|').slice(0, 300))
