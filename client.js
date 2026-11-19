@@ -207,7 +207,7 @@ window.__ModuleLoader__.load({
       'opening.tip': '历史较长时需要一点时间',
       'jump.title': '正在跳到第 {turn} 轮…',
       'jump.hint': '正在定位并高亮命中内容',
-      'global.legend': '▾ 展开 / 收起 　 ↗ 点击跳到该段落并高亮',
+      'global.legend': '▾ 展开 / 收起 　 点击段落即可跳转并高亮',
       'global.refreshing': '正在重建索引…',
       'jump.label': '跳转',
       'jump.paraHint': '跳到这一段并高亮命中内容',
@@ -313,7 +313,7 @@ window.__ModuleLoader__.load({
       'opening.tip': 'Longer histories take a moment',
       'jump.title': 'Jumping to turn {turn}…',
       'jump.hint': 'Locating and highlighting the match',
-      'global.legend': '▾ Expand / collapse 　 ↗ Click a paragraph to jump and highlight',
+      'global.legend': '▾ Expand / collapse 　 Click a paragraph to jump and highlight',
       'global.refreshing': 'Rebuilding the index…',
       'jump.label': 'Jump',
       'jump.paraHint': 'Jump to this paragraph and highlight the match',
@@ -346,7 +346,7 @@ window.__ModuleLoader__.load({
       '.dsh-csearch-title svg{width:13px;height:13px;flex:none;color:var(--dsw-alias-label-secondary)}',
       '.dsh-csearch-root{display:flex;flex-direction:column;min-height:0;height:100%;font-size:var(--dsh-content-font-size-secondary,13px);color:var(--dsw-alias-label-primary)}',
       '.dsh-csearch-head{flex:none;display:flex;flex-direction:column;gap:8px;padding:12px 12px 10px;border-bottom:.5px solid var(--dsw-alias-border-l1)}',
-      '.dsh-csearch-field{display:flex;align-items:center;gap:6px;height:34px;padding:0 6px 0 10px;border:1px solid var(--dsw-alias-border-l1);border-radius:var(--dsw-radius-md,10px);background:var(--dsw-alias-bg-layer-1)}',
+      '.dsh-csearch-field{display:flex;align-items:center;gap:6px;height:34px;padding:0 6px 0 10px;border:.5px solid var(--dsw-alias-border-l1);border-radius:var(--dsw-radius-md,10px);background:var(--dsw-alias-bg-layer-1)}',
       '.dsh-csearch-field:focus-within{border-color:var(--dsw-alias-brand-primary)!important}',
       '.dsh-csearch-input:focus,.dsh-csearch-input:focus-visible{outline:none!important;box-shadow:none!important}',
       '.dsh-csearch-field>svg{width:14px;height:14px;flex:none;color:var(--dsw-alias-label-secondary)}',
@@ -385,7 +385,7 @@ window.__ModuleLoader__.load({
       '.dsh-cg-sub{margin:8px 0 0;color:var(--dsw-alias-label-secondary);line-height:1.6}',
       '.dsh-cg-bar{flex:none;display:flex;flex-direction:column;gap:10px;width:100%;max-width:1080px;margin:0 auto;padding:16px 32px 12px;box-sizing:border-box;border-bottom:.5px solid var(--dsw-alias-border-l1)}',
       '.dsh-cg-row{display:flex;align-items:center;gap:8px}',
-      '.dsh-cg-field{display:flex;align-items:center;gap:8px;flex:1;min-width:0;height:38px;padding:0 10px 0 12px;border:1px solid var(--dsw-alias-border-l1);border-radius:var(--dsw-radius-md,10px);background:var(--dsw-alias-bg-layer-1)}',
+      '.dsh-cg-field{display:flex;align-items:center;gap:8px;flex:1;min-width:0;height:38px;padding:0 10px 0 12px;border:.5px solid var(--dsw-alias-border-l1);border-radius:var(--dsw-radius-md,10px);background:var(--dsw-alias-bg-layer-1)}',
       '.dsh-cg-field:focus-within{border-color:var(--dsw-alias-brand-primary)!important}',
       '.dsh-cg-input:focus,.dsh-cg-input:focus-visible{outline:none!important;box-shadow:none!important}',
       '.dsh-cg-field>svg{width:16px;height:16px;flex:none;color:var(--dsw-alias-label-secondary)}',
@@ -404,9 +404,10 @@ window.__ModuleLoader__.load({
       '.dsh-cg-scope[aria-checked="true"]{border-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-brand-primary);background:rgba(74,144,255,.12);background:color-mix(in srgb,var(--dsw-alias-brand-primary) 10%,transparent)}',
       '.dsh-cg-body{flex:1;min-height:0;overflow-y:auto;width:100%;max-width:1080px;margin:0 auto;padding:6px 32px 48px;box-sizing:border-box}',
       '.dsh-cg-stats{display:flex;align-items:center;flex-wrap:wrap;gap:10px;padding:10px 2px;color:var(--dsw-alias-label-secondary);font-size:12px}',
-      '.dsh-cg-go{margin-left:auto;opacity:0;font-size:12px;color:var(--dsw-alias-brand-primary);transition:opacity .12s}',
-      '.dsh-cg-para:hover .dsh-cg-go,.dsh-cg-para:focus-visible .dsh-cg-go{opacity:1}',
-      '.dsh-cg-jump-btn{flex:none;height:22px;padding:0 8px;border:.5px solid var(--dsw-alias-border-l1);border-radius:999px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:11px;cursor:pointer}',
+      '.dsh-cg-go{margin-left:auto;display:inline-flex;align-items:center;color:var(--dsw-alias-label-secondary);transition:color .12s}',
+      '.dsh-cg-para:hover .dsh-cg-go,.dsh-cg-para:focus-visible .dsh-cg-go{color:var(--dsw-alias-brand-primary)}',
+      '.dsh-cg-go svg,.dsh-csearch-go svg{display:block}',
+      '.dsh-cg-jump-btn{display:inline-flex;align-items:center;justify-content:center;flex:none;height:22px;padding:0 6px;border:.5px solid var(--dsw-alias-border-l1);border-radius:999px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:11px;cursor:pointer}',
       '.dsh-cg-jump-btn:hover{border-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-brand-primary)}',
       '.dsh-cg-legend{padding:0 2px 8px;color:var(--dsw-alias-label-secondary);font-size:11px;opacity:.85}',
       '.dsh-cg-spinner-sm{width:11px;height:11px;border-width:1.5px;margin-right:5px;vertical-align:-1px}',
@@ -485,7 +486,8 @@ window.__ModuleLoader__.load({
       '.dsh-filter-reset:hover:not(:disabled){border-color:var(--dsw-alias-border-l1);color:var(--dsw-alias-label-primary)}',
       /* The reset is only meaningful once something differs from the default window. */
       '.dsh-filter-reset:disabled{opacity:.45;cursor:default}',
-      '.dsh-filter-reset:not(:disabled){border-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-brand-primary);background:rgba(74,144,255,.08);font-weight:600}',
+      /* Enabled is just a normal, clickable text button — not a "selected" state. */
+      '.dsh-filter-reset:not(:disabled){border-color:var(--dsw-alias-border-l1);color:var(--dsw-alias-label-primary);background:transparent}',
       '.dsh-filters-compact{flex-direction:column;align-items:stretch;gap:6px}',
       '.dsh-filter-toggle{display:flex;align-items:center;gap:6px;width:100%;padding:4px 6px;border:0;border-radius:7px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:11px;text-align:left;cursor:pointer}',
       '.dsh-filter-toggle:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}',
@@ -558,8 +560,8 @@ window.__ModuleLoader__.load({
       '.dsh-csearch-item--picked{background:rgba(74,144,255,.14);border-color:var(--dsw-alias-brand-primary);box-shadow:inset 3px 0 0 var(--dsw-alias-brand-primary)}',
       /* Hovering the picked row must not wipe its marker: it is the same row, slightly stronger. */
       '.dsh-csearch-item--picked:hover{background:rgba(74,144,255,.2);border-color:var(--dsw-alias-brand-primary)}',
-      '.dsh-csearch-go{margin-left:auto;opacity:0;color:var(--dsw-alias-brand-primary);font-size:11px;transition:opacity .12s}',
-      '.dsh-csearch-item:hover .dsh-csearch-go,.dsh-csearch-item:focus-visible .dsh-csearch-go{opacity:1}',
+      '.dsh-csearch-go{margin-left:auto;display:inline-flex;align-items:center;color:var(--dsw-alias-label-secondary);transition:color .12s}',
+      '.dsh-csearch-item:hover .dsh-csearch-go,.dsh-csearch-item:focus-visible .dsh-csearch-go{color:var(--dsw-alias-brand-primary)}',
       '.dsh-csearch-item:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-2px}',
       '.dsh-csearch-meta{display:flex;align-items:center;gap:6px;color:var(--dsw-alias-label-secondary);font-size:11px}',
       '.dsh-csearch-hits{padding:0 6px;border-radius:999px;background:color-mix(in srgb,var(--dsw-alias-brand-primary) 12%,transparent);color:var(--dsw-alias-brand-primary)}',
@@ -2783,6 +2785,25 @@ window.__ModuleLoader__.load({
       )
     }
 
+    /** Jump affordance: the curved "go to" arrow, sized like the host's inline icons. */
+    function IconJump(props) {
+      const size = typeof props.size === 'number' ? props.size : 14
+      return h(
+        'svg',
+        {
+          viewBox: '0 0 1024 1024',
+          width: size,
+          height: size,
+          fill: 'currentColor',
+          className: props.className,
+          'aria-hidden': 'true',
+        },
+        h('path', {
+          d: 'M590.665387 86.129778v178.119111c-390.144 0-713.386667 129.649778-544.995556 703.260444-26.396444-358.570667 147.456-471.096889 544.995556-471.096889v174.762667a30.606222 30.606222 0 0 0 52.451555 21.959111l371.768889-291.783111a31.232 31.232 0 0 0 0-44.032l-371.768889-293.205333a30.606222 30.606222 0 1 0-52.451555 22.016z',
+        }),
+      )
+    }
+
     /** The left rail's glyph: a magnifier over message lines. */
     function GlobalSearchIcon(props) {
       const size = typeof props.size === 'number' ? props.size : 18
@@ -3289,7 +3310,7 @@ window.__ModuleLoader__.load({
                     typeof item.hits === 'number' && item.hits > 1
                       ? h('span', { className: 'dsh-csearch-hits' }, t('global.paragraph.hits', { count: item.hits }))
                       : null,
-                    h('span', { className: 'dsh-csearch-go', 'aria-hidden': 'true' }, '↗'),
+                    h('span', { className: 'dsh-csearch-go', 'aria-hidden': 'true' }, h(IconJump, null)),
                   ),
                   item.kind === 'file'
                     ? h(
@@ -3787,7 +3808,7 @@ window.__ModuleLoader__.load({
               : null,
             pendingRow === question.seq + ':' + paragraph.index
               ? spinner('sm')
-              : h('span', { className: 'dsh-cg-go', 'aria-hidden': 'true' }, '↗'),
+              : h('span', { className: 'dsh-cg-go', 'aria-hidden': 'true' }, h(IconJump, null)),
           ),
           fileOnly
             ? h(
@@ -3860,10 +3881,10 @@ window.__ModuleLoader__.load({
                     type: 'button',
                     className: 'dsh-cg-jump-btn',
                     title: t('jump.paraHint'),
+                    'aria-label': t('jump.label'),
                     onClick: () => openQuestion(session, question),
                   },
-                  '↗ ',
-                  t('jump.label'),
+                  h(IconJump, { size: 13 }),
                 ),
           ),
           inputFiles.length === 0
