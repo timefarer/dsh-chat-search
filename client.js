@@ -2242,11 +2242,13 @@ window.__ModuleLoader__.load({
         for (const command of commands) {
           const isGlobal = command.id.endsWith('.global')
           const preferred = isGlobal ? GLOBAL_CANDIDATES[0] : { code: 'KeyF', modifiers: ['primary'] }
-          /* An owned default is not something this plugin should silently move away from: omit the
-             default (the command stays registered and bindable) and say who holds the key. */
-          const conflicts = isGlobal ? bindingConflicts(shortcuts, preferred) : []
+          /* Conflicts with our own command are not conflicts: the plugin can apply twice (desktop
+             reload, HMR), and the second apply would otherwise "discover" itself as the owner and
+             move the shortcut to another key. */
+          const ours = (id) => id === command.id || id.startsWith('conversation-search.')
+          const foreign = isGlobal ? bindingConflicts(shortcuts, preferred).filter((id) => !ours(id)) : []
           const defaults =
-            conflicts.length === 0
+            foreign.length === 0
               ? { 'desktop:macos': preferred, 'desktop:windows': preferred, 'desktop:linux': preferred }
               : {}
           let registered = false
@@ -2263,42 +2265,37 @@ window.__ModuleLoader__.load({
             if (typeof dispose === 'function') disposeList.push(dispose)
             if (isGlobal) {
               globalBinding = preferred
-              if (conflicts.length > 0) {
+              if (foreign.length > 0) {
                 shortcutNotice = {
                   id: command.id,
                   keys: formatShortcut(preferred, shortcuts.platform),
-                  ids: conflicts,
+                  ids: foreign,
                   conflict: true,
                 }
-                console.warn('[conversation-search] global shortcut already owned:', shortcutNotice.keys, '->', conflicts.join(', '))
+                console.warn('[conversation-search] global shortcut already owned:', shortcutNotice.keys, '->', foreign.join(', '))
               }
             }
             registered = true
           } catch (error) {
-            debugLog('shortcut registry refused the binding', { id: command.id, code: preferred.code, message: String(error && error.message) })
-          }
-          if (!registered && isGlobal) {
-            /* Last resort, only if even the unbound registration failed: keep it usable somewhere. */
-            for (const binding of GLOBAL_CANDIDATES.slice(1)) {
-              try {
-                const dispose = shortcuts.register({
-                  id: command.id,
-                  label: command.label,
-                  aliases: command.aliases,
-                  defaults: { 'desktop:macos': binding, 'desktop:windows': binding, 'desktop:linux': binding },
-                  regions: ['page', 'editable'],
-                  modals: [],
-                  resolve: () => ({ status: 'handled', run: command.run }),
-                })
-                if (typeof dispose === 'function') disposeList.push(dispose)
-                globalBinding = binding
-                shortcutNotice = { id: command.id, keys: formatShortcut(binding, shortcuts.platform), ids: [], fallback: true }
-                registered = true
-                break
-              } catch (error) {
-                debugLog('shortcut fallback refused', { code: binding.code, message: String(error && error.message) })
+            const owners = isGlobal ? bindingConflicts(shortcuts, preferred).filter((id) => !ours(id)) : []
+            if (isGlobal && owners.length === 0) {
+              /* Our own earlier apply already registered it: keep that binding and stay quiet. */
+              globalBinding = preferred
+              registered = true
+            } else if (isGlobal) {
+              /* Never move to another combo. The command may drop out of Settings if the registry
+                 refuses even an unbound registration; the page listener still watches the default
+                 key, so the shortcut itself keeps working. */
+              shortcutNotice = {
+                id: command.id,
+                keys: formatShortcut(preferred, shortcuts.platform),
+                ids: owners.length > 0 ? owners : foreign,
+                conflict: true,
               }
+              globalBinding = preferred
+              console.warn('[conversation-search] global shortcut already owned:', shortcutNotice.keys, '->', shortcutNotice.ids.join(', '))
             }
+            debugLog('shortcut registry refused the binding', { id: command.id, code: preferred.code, message: String(error && error.message) })
           }
           if (!registered) debugLog('shortcut command could not be registered', { id: command.id })
         }
