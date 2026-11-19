@@ -347,7 +347,8 @@ window.__ModuleLoader__.load({
       '.dsh-csearch-root{display:flex;flex-direction:column;min-height:0;height:100%;font-size:var(--dsh-content-font-size-secondary,13px);color:var(--dsw-alias-label-primary)}',
       '.dsh-csearch-head{flex:none;display:flex;flex-direction:column;gap:8px;padding:12px 12px 10px;border-bottom:.5px solid var(--dsw-alias-border-l1)}',
       '.dsh-csearch-field{display:flex;align-items:center;gap:6px;height:34px;padding:0 6px 0 10px;border:1px solid var(--dsw-alias-border-l1);border-radius:var(--dsw-radius-md,10px);background:var(--dsw-alias-bg-layer-1)}',
-      '.dsh-csearch-field:focus-within{border-color:var(--dsw-alias-brand-primary)}',
+      '.dsh-csearch-field:focus-within{border-color:var(--dsw-alias-brand-primary)!important}',
+      '.dsh-csearch-input:focus,.dsh-csearch-input:focus-visible{outline:none!important;box-shadow:none!important}',
       '.dsh-csearch-field>svg{width:14px;height:14px;flex:none;color:var(--dsw-alias-label-secondary)}',
       '.dsh-csearch-input{flex:1;min-width:0;height:100%;border:0;outline:0;background:transparent;color:var(--dsw-alias-label-primary);font:inherit;font-size:var(--dsh-content-font-size,14px)}',
       '.dsh-csearch-input::placeholder{color:var(--dsw-alias-label-secondary)}',
@@ -385,7 +386,8 @@ window.__ModuleLoader__.load({
       '.dsh-cg-bar{flex:none;display:flex;flex-direction:column;gap:10px;width:100%;max-width:1080px;margin:0 auto;padding:16px 32px 12px;box-sizing:border-box;border-bottom:.5px solid var(--dsw-alias-border-l1)}',
       '.dsh-cg-row{display:flex;align-items:center;gap:8px}',
       '.dsh-cg-field{display:flex;align-items:center;gap:8px;flex:1;min-width:0;height:38px;padding:0 10px 0 12px;border:1px solid var(--dsw-alias-border-l1);border-radius:var(--dsw-radius-md,10px);background:var(--dsw-alias-bg-layer-1)}',
-      '.dsh-cg-field:focus-within{border-color:var(--dsw-alias-brand-primary)}',
+      '.dsh-cg-field:focus-within{border-color:var(--dsw-alias-brand-primary)!important}',
+      '.dsh-cg-input:focus,.dsh-cg-input:focus-visible{outline:none!important;box-shadow:none!important}',
       '.dsh-cg-field>svg{width:16px;height:16px;flex:none;color:var(--dsw-alias-label-secondary)}',
       '.dsh-cg-clear{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;padding:0;border:0;border-radius:50%;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;flex:none}',
       '.dsh-cg-clear:hover{background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary)}',
@@ -475,14 +477,15 @@ window.__ModuleLoader__.load({
       '.dsh-filter-input:focus{border-color:var(--dsw-alias-brand-primary);outline:0}',
       /* A value the reader changed is blue, so a stale date cannot hide in plain sight. */
       '.dsh-filter-input--modified{color:var(--dsw-alias-brand-primary);border-color:var(--dsw-alias-brand-primary)}',
-      '.dsh-filter-badge{display:inline-flex;align-items:center;height:18px;padding:0 6px;border-radius:999px;background:rgba(74,144,255,.12);color:var(--dsw-alias-brand-primary);font-size:11px;line-height:1}',
+      '.dsh-filter-badge{display:inline-flex;align-items:center;height:18px;padding:0 7px;border-radius:999px;background:rgba(74,144,255,.12);color:var(--dsw-alias-brand-primary);font-size:11px;line-height:1}',
+      '.dsh-filter-head{display:inline-flex;align-items:center;gap:6px}',
       '.dsh-filter-number{width:64px}',
       '.dsh-filter-dash{color:var(--dsw-alias-label-secondary)}',
       '.dsh-filter-reset{height:26px;padding:0 8px;border:.5px solid transparent;border-radius:7px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:12px;cursor:pointer}',
       '.dsh-filter-reset:hover:not(:disabled){border-color:var(--dsw-alias-border-l1);color:var(--dsw-alias-label-primary)}',
       /* The reset is only meaningful once something differs from the default window. */
       '.dsh-filter-reset:disabled{opacity:.45;cursor:default}',
-      '.dsh-filter-reset:not(:disabled){color:var(--dsw-alias-brand-primary)}',
+      '.dsh-filter-reset:not(:disabled){border-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-brand-primary);background:rgba(74,144,255,.08);font-weight:600}',
       '.dsh-filters-compact{flex-direction:column;align-items:stretch;gap:6px}',
       '.dsh-filter-toggle{display:flex;align-items:center;gap:6px;width:100%;padding:4px 6px;border:0;border-radius:7px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:11px;text-align:left;cursor:pointer}',
       '.dsh-filter-toggle:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}',
@@ -2892,9 +2895,18 @@ window.__ModuleLoader__.load({
       return h(
         'div',
         { className: 'dsh-filters' },
+        filterHead(t, value),
+        filterFields(t, value, onChange),
+      )
+    }
+
+    /** Title plus the "已自定义" badge, so the badge sits beside 筛选 instead of above the fields. */
+    function filterHead(t, value) {
+      return h(
+        'span',
+        { className: 'dsh-filter-head' },
         h('span', { className: 'dsh-filter-title' }, t('filters.label')),
         filtersModified(value) ? h('span', { className: 'dsh-filter-badge' }, t('filters.modified')) : null,
-        filterFields(t, value, onChange),
       )
     }
 
@@ -2903,8 +2915,7 @@ window.__ModuleLoader__.load({
       return h(
         'div',
         { className: 'dsh-filters dsh-filters-compact' },
-        h('span', { className: 'dsh-filter-title' }, t('filters.label')),
-        filtersModified(value) ? h('span', { className: 'dsh-filter-badge' }, t('filters.modified')) : null,
+        filterHead(t, value),
         filterFields(t, value, onChange),
       )
     }
@@ -3821,8 +3832,14 @@ window.__ModuleLoader__.load({
               text,
             )
           : h(
-              'div',
-              { className: 'dsh-cg-question-toggle', 'data-csearch-row': '' },
+              'button',
+              {
+                type: 'button',
+                className: 'dsh-cg-question-toggle',
+                'data-csearch-row': '',
+                title: t('jump.paraHint'),
+                onClick: () => openQuestion(session, question),
+              },
               h('span', { className: 'dsh-cg-caret-space' }),
               label,
               text,
