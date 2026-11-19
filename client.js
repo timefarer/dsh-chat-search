@@ -344,8 +344,8 @@ window.__ModuleLoader__.load({
       '.dsh-csearch-title svg{width:13px;height:13px;flex:none;color:var(--dsw-alias-label-secondary)}',
       '.dsh-csearch-root{display:flex;flex-direction:column;min-height:0;height:100%;font-size:var(--dsh-content-font-size-secondary,13px);color:var(--dsw-alias-label-primary)}',
       '.dsh-csearch-head{flex:none;display:flex;flex-direction:column;gap:8px;padding:12px 12px 10px;border-bottom:.5px solid var(--dsw-alias-border-l1)}',
-      '.dsh-csearch-field{display:flex;align-items:center;gap:6px;height:32px;padding:0 6px 0 10px;border:.5px solid var(--dsw-alias-border-l1);border-radius:var(--dsw-radius-md,10px);background:var(--dsw-alias-bg-layer-2)}',
-      '.dsh-csearch-field:focus-within{border-color:var(--dsw-alias-brand-primary)}',
+      '.dsh-csearch-field{display:flex;align-items:center;gap:6px;height:34px;padding:0 6px 0 10px;border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-md,10px);background:var(--dsw-alias-bg-layer-2)}',
+      '.dsh-csearch-field:focus-within{border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 2px rgba(74,144,255,.18)}',
       '.dsh-csearch-field>svg{width:14px;height:14px;flex:none;color:var(--dsw-alias-label-secondary)}',
       '.dsh-csearch-input{flex:1;min-width:0;height:100%;border:0;outline:0;background:transparent;color:var(--dsw-alias-label-primary);font:inherit;font-size:var(--dsh-content-font-size,14px)}',
       '.dsh-csearch-input::placeholder{color:var(--dsw-alias-label-secondary)}',
@@ -382,8 +382,8 @@ window.__ModuleLoader__.load({
       '.dsh-cg-sub{margin:8px 0 0;color:var(--dsw-alias-label-secondary);line-height:1.6}',
       '.dsh-cg-bar{flex:none;display:flex;flex-direction:column;gap:10px;width:100%;max-width:1080px;margin:0 auto;padding:16px 32px 12px;box-sizing:border-box;border-bottom:.5px solid var(--dsw-alias-border-l1)}',
       '.dsh-cg-row{display:flex;align-items:center;gap:8px}',
-      '.dsh-cg-field{display:flex;align-items:center;gap:8px;flex:1;min-width:0;height:38px;padding:0 10px 0 12px;border:.5px solid var(--dsw-alias-border-l1);border-radius:var(--dsw-radius-md,10px);background:var(--dsw-alias-bg-layer-2)}',
-      '.dsh-cg-field:focus-within{border-color:var(--dsw-alias-brand-primary)}',
+      '.dsh-cg-field{display:flex;align-items:center;gap:8px;flex:1;min-width:0;height:38px;padding:0 10px 0 12px;border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-md,10px);background:var(--dsw-alias-bg-layer-2)}',
+      '.dsh-cg-field:focus-within{border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 2px rgba(74,144,255,.18)}',
       '.dsh-cg-field>svg{width:16px;height:16px;flex:none;color:var(--dsw-alias-label-secondary)}',
       '.dsh-cg-clear{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;padding:0;border:0;border-radius:50%;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;flex:none}',
       '.dsh-cg-clear:hover{background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary)}',
@@ -470,7 +470,7 @@ window.__ModuleLoader__.load({
       '.dsh-filter-field{display:flex;align-items:center;gap:4px}',
       '.dsh-filter-label{color:var(--dsw-alias-label-secondary);font-size:11px}',
       '.dsh-filter-input{height:26px;padding:0 6px;border:.5px solid var(--dsw-alias-border-l1);border-radius:7px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font:inherit;font-size:12px}',
-      '.dsh-filter-input:focus{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-1px}',
+      '.dsh-filter-input:focus{border-color:var(--dsw-alias-brand-primary);outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-1px}',
       /* A value the reader changed is blue, so a stale date cannot hide in plain sight. */
       '.dsh-filter-input--modified{color:var(--dsw-alias-brand-primary);border-color:var(--dsw-alias-brand-primary)}',
       '.dsh-filter-number{width:64px}',
@@ -2888,24 +2888,13 @@ window.__ModuleLoader__.load({
       )
     }
 
-    /** The panel's collapsed bar: one toggle line that names the active window. */
-    function filterBarCompact(t, value, onChange, open, onToggle) {
+    /** The panel's bar: the editable fields themselves, with no extra summary line above them. */
+    function filterBarCompact(t, value, onChange) {
       return h(
         'div',
         { className: 'dsh-filters dsh-filters-compact' },
-        h(
-          'button',
-          {
-            type: 'button',
-            className: 'dsh-filter-toggle',
-            'aria-expanded': open,
-            onClick: onToggle,
-          },
-          h(IconFilter, null),
-          h('span', { className: 'dsh-filter-toggle-label' }, t('filters.label')),
-          h('span', { className: 'dsh-filter-summary' }, filtersSummary(t, value)),
-        ),
-        open ? filterFields(t, value, onChange) : null,
+        h('span', { className: 'dsh-filter-title' }, t('filters.label')),
+        filterFields(t, value, onChange),
       )
     }
 
@@ -2953,7 +2942,6 @@ window.__ModuleLoader__.load({
 
       const [query, setQuery] = useState(() => storedQuery(sessionId))
       const [filters, setFilters] = useState(() => defaultFilters())
-      const [filtersOpen, setFiltersOpen] = useState(false)
       const [scope, setScope] = useState('all')
       /* The row that was opened last (or that a global jump landed on): both lists mark it the same. */
       const [pickedAnchor, setPickedAnchor] = useState('')
@@ -3322,7 +3310,7 @@ window.__ModuleLoader__.load({
               ? null
               : h('button', { type: 'button', className: 'dsh-csearch-clear', title: t('clear'), 'aria-label': t('clear'), onClick: onClear }, h(IconClose, null)),
           ),
-          filterBarCompact(t, filters, applyFilters, filtersOpen, () => setFiltersOpen((current) => !current)),
+          filterBarCompact(t, filters, applyFilters),
           query.trim() === ''
             ? null
             : h(

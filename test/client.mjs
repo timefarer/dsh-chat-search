@@ -935,12 +935,9 @@ if (panelOldInput !== null) panelOldInput.props.onChange({ target: { value: '远
 panelOldTree = await settle('panel-old', bodyRegistration.Component, panelOldProps)
 const panelOldText = flatten(panelOldTree).join('|')
 check('the default window hides an old Turn', !panelOldText.includes('远古标记的回复'), panelOldText.slice(0, 400))
-const panelToggle = findNode(panelOldTree, 'dsh-filter-toggle')
-check('the panel offers the filter toggle', panelToggle !== null)
-check('the panel summarises the window', panelOldText.includes('最近 30 轮'), panelOldText.slice(0, 400))
+check('the panel shows the editable window directly', findAllInClass(panelOldTree, 'dsh-filter-input').length >= 2)
+check('the panel has no extra summary layer above the fields', findNode(panelOldTree, 'dsh-filter-toggle') === null)
 
-/* Open the editor, clear both dates and the turn count: the old Turn must come back. */
-if (panelToggle !== null) panelToggle.props.onClick()
 panelOldTree = await settle('panel-old', bodyRegistration.Component, panelOldProps)
 const dateInputs = () => findAllInClass(panelOldTree, 'dsh-filter-input').filter((node) => node.props.type === 'date')
 check('opening the filter reveals the fields', dateInputs().length === 2, String(dateInputs().length))

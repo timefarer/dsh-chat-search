@@ -547,10 +547,12 @@ function createIndex(ctx) {
             return entry
           } catch (error) {
             return undefined
+          } finally {
+            /* Count each Session as it finishes, not each batch of 8: the page polls this. */
+            progress.done += 1
           }
         }),
       )
-      progress.done += batch.length
       for (const entry of parsed) {
         if (entry === undefined) continue
         next.set(entry.id, entry)
