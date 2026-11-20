@@ -381,7 +381,9 @@ window.__ModuleLoader__.load({
       '.dsh-cg-page{display:flex;flex-direction:column;flex:1 1 auto;height:100%;min-height:0;overflow:hidden;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);font-size:var(--dsh-content-font-size-secondary,13px)}',
       '.dsh-cg-head{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;flex:none;width:100%;max-width:1080px;margin:0 auto;padding:28px 32px 0;box-sizing:border-box}',
       '.dsh-cg-head-text{min-width:0}',
-      '.dsh-cg-refresh{display:flex;flex-direction:column;align-items:flex-end;gap:4px;margin:8px 0 4px auto;width:min(300px,60%)}',
+      '.dsh-cg-refresh-anchor{position:relative;display:inline-flex}',
+      /* A compact popover under the button, on one line, so it never reflows the actions row. */
+      '.dsh-cg-refresh{position:absolute;top:calc(100% + 6px);right:0;z-index:5;display:flex;flex-direction:column;align-items:flex-end;gap:4px;width:min(260px,44vw);padding:8px 10px;border:.5px solid var(--dsw-alias-border-l1);border-radius:10px;background:var(--dsw-alias-bg-layer-1,#fff);box-shadow:0 4px 14px rgba(0,0,0,.12);white-space:nowrap}',
       '.dsh-cg-refresh .dsh-cg-progress{width:100%;margin:0;align-items:flex-end}',
       '.dsh-cg-refresh .dsh-cg-progress-track{width:100%}',
       '.dsh-cg-title{margin:0;font-size:calc(var(--dsh-content-font-size,14px) + 7px);font-weight:600;line-height:1.3}',
@@ -4197,31 +4199,35 @@ window.__ModuleLoader__.load({
                   : h(
                       'span',
                       { className: 'dsh-cg-stats-actions' },
+                      /* Anchored wrapper: the progress popover hangs directly under 刷新索引. */
                       h(
-                        'button',
-                        {
-                          type: 'button',
-                          className: 'dsh-cg-link',
-                          disabled: refreshingNow,
-                          onClick: refresh,
-                        },
-                        t('global.refresh'),
+                        'span',
+                        { className: 'dsh-cg-refresh-anchor' },
+                        h(
+                          'button',
+                          {
+                            type: 'button',
+                            className: 'dsh-cg-link',
+                            disabled: refreshingNow,
+                            onClick: refresh,
+                          },
+                          t('global.refresh'),
+                        ),
+                        refreshingNow
+                          ? h(
+                              'div',
+                              { className: 'dsh-cg-refresh', role: 'status', 'aria-live': 'polite' },
+                              spinner('sm'),
+                              buildBar !== null
+                                ? buildBar
+                                : h('span', { className: 'dsh-cg-progress-text' }, t('global.building')),
+                            )
+                          : null,
                       ),
                       h('button', { type: 'button', className: 'dsh-cg-link', onClick: expandAll }, t('expandAll')),
                       h('button', { type: 'button', className: 'dsh-cg-link', onClick: collapseAll }, t('collapseAll')),
                     ),
               ),
-          /* Refresh progress sits right below 刷新索引, where the click happened. */
-          refreshingNow
-            ? h(
-                'div',
-                { className: 'dsh-cg-refresh', role: 'status', 'aria-live': 'polite' },
-                spinner('sm'),
-                buildBar !== null
-                  ? buildBar
-                  : h('span', { className: 'dsh-cg-progress-text' }, t('global.building')),
-              )
-            : null,
           stats === null || sessions.length === 0 ? null : h('div', { className: 'dsh-cg-legend' }, t('global.legend')),
           firstBuild ? progressBlock : body,
         ),
