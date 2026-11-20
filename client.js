@@ -383,13 +383,6 @@ window.__ModuleLoader__.load({
       '.dsh-cg-page{display:flex;flex-direction:column;flex:1 1 auto;height:100%;min-height:0;overflow:hidden;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);font-size:var(--dsh-content-font-size-secondary,13px)}',
       '.dsh-cg-head{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;flex:none;width:100%;max-width:1080px;margin:0 auto;padding:28px 32px 0;box-sizing:border-box}',
       '.dsh-cg-head-text{min-width:0}',
-      '.dsh-cg-refresh-btn{position:relative;display:inline-flex;align-items:center;gap:5px;padding-bottom:7px;overflow:hidden}',
-      /* Track starts where the spinner starts, so the bar reads as part of the label, and it keeps
-         the creation-progress colour. */
-      '.dsh-cg-btn-track{position:absolute;left:8px;right:8px;bottom:3px;height:2px;border-radius:2px;overflow:hidden}',
-      '.dsh-cg-btn-progress{display:block;height:100%;border-radius:2px;background:var(--dsw-alias-brand-primary);transition:width .2s ease}',
-      '.dsh-cg-btn-progress--indeterminate{position:absolute;width:30%;animation:dsh-cg-btn-slide 1.1s ease-in-out infinite}',
-      '@keyframes dsh-cg-btn-slide{0%{left:-30%}100%{left:100%}}',
       '.dsh-cg-title{margin:0;font-size:calc(var(--dsh-content-font-size,14px) + 7px);font-weight:600;line-height:1.3}',
       '.dsh-cg-sub{margin:8px 0 0;color:var(--dsw-alias-label-secondary);line-height:1.6}',
       '.dsh-cg-bar{flex:none;display:flex;flex-direction:column;gap:10px;width:100%;max-width:1080px;margin:0 auto;padding:16px 32px 12px;box-sizing:border-box;border-bottom:.5px solid var(--dsw-alias-border-l1)}',
@@ -510,6 +503,13 @@ window.__ModuleLoader__.load({
       '.dsh-cg-stats-actions{display:flex;gap:4px;margin-left:auto}',
       '.dsh-cg-link{padding:3px 8px;border:.5px solid transparent;border-radius:7px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:12px;cursor:pointer}',
       '.dsh-cg-link:disabled{opacity:.45;cursor:default}',
+      '.dsh-cg-refresh-btn{position:relative;display:inline-flex;align-items:center;gap:5px;padding-bottom:7px;overflow:hidden}',
+      /* Track starts where the spinner starts, so the bar reads as part of the label, and it keeps
+         the creation-progress colour. */
+      '.dsh-cg-btn-track{position:absolute;left:8px;right:8px;bottom:3px;height:2px;border-radius:2px;overflow:hidden}',
+      '.dsh-cg-btn-progress{display:block;height:100%;border-radius:2px;background:var(--dsw-alias-brand-primary);transition:width .2s ease}',
+      '.dsh-cg-btn-progress--indeterminate{position:absolute;width:30%;animation:dsh-cg-btn-slide 1.1s ease-in-out infinite}',
+      '@keyframes dsh-cg-btn-slide{0%{left:-30%}100%{left:100%}}',
       '.dsh-cg-link:hover{border-color:var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}',
       '.dsh-cg-tree{display:flex;flex-direction:column;gap:10px}',
       '.dsh-cg-tree[data-loading="true"]{opacity:.55}',
