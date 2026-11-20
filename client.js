@@ -346,8 +346,11 @@ window.__ModuleLoader__.load({
       '.dsh-csearch-title svg{width:13px;height:13px;flex:none;color:var(--dsw-alias-label-secondary)}',
       '.dsh-csearch-root{display:flex;flex-direction:column;min-height:0;height:100%;font-size:var(--dsh-content-font-size-secondary,13px);color:var(--dsw-alias-label-primary)}',
       '.dsh-csearch-head{flex:none;display:flex;flex-direction:column;gap:8px;padding:12px 12px 10px;border-bottom:.5px solid var(--dsw-alias-border-l1)}',
-      '.dsh-csearch-field{display:flex;align-items:center;gap:6px;height:34px;padding:0 6px 0 10px;border:.5px solid var(--dsw-alias-border-l1);border-radius:var(--dsw-radius-md,10px);background:var(--dsw-alias-bg-layer-1)}',
-      '.dsh-csearch-field:focus-within{border-color:var(--dsw-alias-brand-primary)!important}',
+      /* Mirrors the host's own search field (插件 → 发现): hairline l3, 12px radius, hover l2,
+         focus business-primary. Brand-primary is a different token and left the border black. */
+      '.dsh-csearch-field{display:flex;align-items:center;gap:6px;height:34px;padding:0 6px 0 10px;border:.5px solid var(--dsw-alias-border-l3);border-radius:12px;background:var(--dsw-alias-bg-layer-1);transition:border-color .15s}',
+      '.dsh-csearch-field:hover{border-color:var(--dsw-alias-border-l2)}',
+      '.dsh-csearch-field:focus-within{border-color:var(--dsw-alias-state-business-primary,#4f6ef7)!important}',
       '.dsh-csearch-input:focus,.dsh-csearch-input:focus-visible{outline:none!important;box-shadow:none!important}',
       '.dsh-csearch-field>svg{width:14px;height:14px;flex:none;color:var(--dsw-alias-label-secondary)}',
       '.dsh-csearch-input{flex:1;min-width:0;height:100%;border:0;outline:0;background:transparent;color:var(--dsw-alias-label-primary);font:inherit;font-size:var(--dsh-content-font-size,14px)}',
@@ -378,15 +381,16 @@ window.__ModuleLoader__.load({
       '.dsh-cg-page{display:flex;flex-direction:column;flex:1 1 auto;height:100%;min-height:0;overflow:hidden;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);font-size:var(--dsh-content-font-size-secondary,13px)}',
       '.dsh-cg-head{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;flex:none;width:100%;max-width:1080px;margin:0 auto;padding:28px 32px 0;box-sizing:border-box}',
       '.dsh-cg-head-text{min-width:0}',
-      '.dsh-cg-head-progress{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex:none;width:min(260px,32%);padding-top:2px}',
-      '.dsh-cg-head-progress .dsh-cg-progress{margin:0;width:100%;align-items:flex-end}',
-      '.dsh-cg-head-progress .dsh-cg-progress-track{width:100%}',
+      '.dsh-cg-refresh{display:flex;flex-direction:column;align-items:flex-end;gap:4px;margin:8px 0 4px auto;width:min(300px,60%)}',
+      '.dsh-cg-refresh .dsh-cg-progress{width:100%;margin:0;align-items:flex-end}',
+      '.dsh-cg-refresh .dsh-cg-progress-track{width:100%}',
       '.dsh-cg-title{margin:0;font-size:calc(var(--dsh-content-font-size,14px) + 7px);font-weight:600;line-height:1.3}',
       '.dsh-cg-sub{margin:8px 0 0;color:var(--dsw-alias-label-secondary);line-height:1.6}',
       '.dsh-cg-bar{flex:none;display:flex;flex-direction:column;gap:10px;width:100%;max-width:1080px;margin:0 auto;padding:16px 32px 12px;box-sizing:border-box;border-bottom:.5px solid var(--dsw-alias-border-l1)}',
       '.dsh-cg-row{display:flex;align-items:center;gap:8px}',
-      '.dsh-cg-field{display:flex;align-items:center;gap:8px;flex:1;min-width:0;height:38px;padding:0 10px 0 12px;border:.5px solid var(--dsw-alias-border-l1);border-radius:var(--dsw-radius-md,10px);background:var(--dsw-alias-bg-layer-1)}',
-      '.dsh-cg-field:focus-within{border-color:var(--dsw-alias-brand-primary)!important}',
+      '.dsh-cg-field{display:flex;align-items:center;gap:8px;flex:1;min-width:0;height:38px;padding:0 10px 0 12px;border:.5px solid var(--dsw-alias-border-l3);border-radius:12px;background:var(--dsw-alias-bg-layer-1);transition:border-color .15s}',
+      '.dsh-cg-field:hover{border-color:var(--dsw-alias-border-l2)}',
+      '.dsh-cg-field:focus-within{border-color:var(--dsw-alias-state-business-primary,#4f6ef7)!important}',
       '.dsh-cg-input:focus,.dsh-cg-input:focus-visible{outline:none!important;box-shadow:none!important}',
       '.dsh-cg-field>svg{width:16px;height:16px;flex:none;color:var(--dsw-alias-label-secondary)}',
       '.dsh-cg-clear{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;padding:0;border:0;border-radius:50%;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;flex:none}',
@@ -474,8 +478,8 @@ window.__ModuleLoader__.load({
       '.dsh-filter-body{display:flex;align-items:center;gap:6px;flex-wrap:wrap}',
       '.dsh-filter-field{display:flex;align-items:center;gap:4px}',
       '.dsh-filter-label{color:var(--dsw-alias-label-secondary);font-size:11px}',
-      '.dsh-filter-input{height:26px;padding:0 6px;border:.5px solid var(--dsw-alias-border-l1);border-radius:7px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font:inherit;font-size:12px}',
-      '.dsh-filter-input:focus{border-color:var(--dsw-alias-brand-primary);outline:0}',
+      '.dsh-filter-input{height:26px;padding:0 6px;border:.5px solid var(--dsw-alias-border-l3);border-radius:7px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font:inherit;font-size:12px;transition:border-color .15s}',
+      '.dsh-filter-input:focus{border-color:var(--dsw-alias-state-business-primary,#4f6ef7);outline:0}',
       /* A value the reader changed is blue, so a stale date cannot hide in plain sight. */
       '.dsh-filter-input--modified{color:var(--dsw-alias-brand-primary);border-color:var(--dsw-alias-brand-primary)}',
       '.dsh-filter-badge{display:inline-flex;align-items:center;height:18px;padding:0 7px;border-radius:999px;background:rgba(74,144,255,.12);color:var(--dsw-alias-brand-primary);font-size:11px;line-height:1}',
@@ -499,6 +503,7 @@ window.__ModuleLoader__.load({
       '.dsh-csearch-scope[aria-checked="true"]{border-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-brand-primary);background:rgba(74,144,255,.12)}',
       '.dsh-cg-stats-actions{display:flex;gap:4px;margin-left:auto}',
       '.dsh-cg-link{padding:3px 8px;border:.5px solid transparent;border-radius:7px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:12px;cursor:pointer}',
+      '.dsh-cg-link:disabled{opacity:.45;cursor:default}',
       '.dsh-cg-link:hover{border-color:var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}',
       '.dsh-cg-tree{display:flex;flex-direction:column;gap:10px}',
       '.dsh-cg-tree[data-loading="true"]{opacity:.55}',
@@ -3289,17 +3294,16 @@ window.__ModuleLoader__.load({
                   markSegments(segmentsOf(group.question === '' ? t('group.noQuestion') : group.question, words)),
                 ),
               ),
-              group.items.map((item) =>
-                h(
+              group.items.map((item) => {
+                const picked = item.kind !== 'file' && anchorMatches(item.anchor, pickedAnchor)
+                return h(
                   'button',
                   {
                     type: 'button',
-                    className: item.kind !== 'file' && anchorMatches(item.anchor, pickedAnchor)
-                      ? 'dsh-csearch-item dsh-csearch-item--picked'
-                      : 'dsh-csearch-item',
+                    className: picked ? 'dsh-csearch-item dsh-csearch-item--picked' : 'dsh-csearch-item',
                     key: item.key + ':' + item.index,
                     'data-csearch-row': '',
-                    title: t('jump.paraHint'),
+                    title: picked ? undefined : t('jump.paraHint'),
                     onClick: () => onPick(item, words),
                   },
                   h(
@@ -3310,7 +3314,9 @@ window.__ModuleLoader__.load({
                     typeof item.hits === 'number' && item.hits > 1
                       ? h('span', { className: 'dsh-csearch-hits' }, t('global.paragraph.hits', { count: item.hits }))
                       : null,
-                    h('span', { className: 'dsh-csearch-go', 'aria-hidden': 'true' }, h(IconJump, null)),
+                    /* The picked row is already at that paragraph: an arrow would promise a jump
+                       that cannot happen. The global page keeps it (it can still open a Session). */
+                    picked ? null : h('span', { className: 'dsh-csearch-go', 'aria-hidden': 'true' }, h(IconJump, null)),
                   ),
                   item.kind === 'file'
                     ? h(
@@ -3321,8 +3327,8 @@ window.__ModuleLoader__.load({
                         ),
                       )
                     : h('span', { className: 'dsh-csearch-snippet' }, markSegments(item.segments)),
-                ),
-              ),
+                )
+              }),
             ),
           ),
         )
@@ -4091,17 +4097,6 @@ window.__ModuleLoader__.load({
             h('h1', { className: 'dsh-cg-title' }, t('global.title'), h('span', { className: 'dsh-cg-build' }, BUILD)),
             h('p', { className: 'dsh-cg-sub' }, t('global.subtitle')),
           ),
-          /* Refresh borrows the header instead of covering the results: the numbers stay visible. */
-          refreshingNow
-            ? h(
-                'div',
-                { className: 'dsh-cg-head-progress', role: 'status', 'aria-live': 'polite' },
-                spinner('sm'),
-                buildBar !== null
-                  ? buildBar
-                  : h('span', { className: 'dsh-cg-progress-text' }, t('global.building')),
-              )
-            : null,
         ),
         firstBuild
           ? null
@@ -4202,13 +4197,31 @@ window.__ModuleLoader__.load({
                   : h(
                       'span',
                       { className: 'dsh-cg-stats-actions' },
-                      refreshingNow
-                        ? null
-                        : h('button', { type: 'button', className: 'dsh-cg-link', onClick: refresh }, t('global.refresh')),
+                      h(
+                        'button',
+                        {
+                          type: 'button',
+                          className: 'dsh-cg-link',
+                          disabled: refreshingNow,
+                          onClick: refresh,
+                        },
+                        t('global.refresh'),
+                      ),
                       h('button', { type: 'button', className: 'dsh-cg-link', onClick: expandAll }, t('expandAll')),
                       h('button', { type: 'button', className: 'dsh-cg-link', onClick: collapseAll }, t('collapseAll')),
                     ),
               ),
+          /* Refresh progress sits right below 刷新索引, where the click happened. */
+          refreshingNow
+            ? h(
+                'div',
+                { className: 'dsh-cg-refresh', role: 'status', 'aria-live': 'polite' },
+                spinner('sm'),
+                buildBar !== null
+                  ? buildBar
+                  : h('span', { className: 'dsh-cg-progress-text' }, t('global.building')),
+              )
+            : null,
           stats === null || sessions.length === 0 ? null : h('div', { className: 'dsh-cg-legend' }, t('global.legend')),
           firstBuild ? progressBlock : body,
         ),
