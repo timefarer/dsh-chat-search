@@ -503,13 +503,15 @@ window.__ModuleLoader__.load({
       '.dsh-cg-stats-actions{display:flex;gap:4px;margin-left:auto}',
       '.dsh-cg-link{padding:3px 8px;border:.5px solid transparent;border-radius:7px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:12px;cursor:pointer}',
       '.dsh-cg-link:disabled{opacity:.45;cursor:default}',
+      /* Refreshing reuses the plain link button (no padding, no border) so the action row never
+         reflows; the progress bar rules are kept but unused until the corpus needs them.
       '.dsh-cg-refresh-btn{position:relative;display:inline-flex;align-items:center;gap:5px;padding-bottom:7px;overflow:hidden}',
-      /* Track starts where the spinner starts, so the bar reads as part of the label, and it keeps
-         the creation-progress colour. */
       '.dsh-cg-btn-track{position:absolute;left:8px;right:8px;bottom:3px;height:2px;border-radius:2px;overflow:hidden}',
       '.dsh-cg-btn-progress{display:block;height:100%;border-radius:2px;background:var(--dsw-alias-brand-primary);transition:width .2s ease}',
       '.dsh-cg-btn-progress--indeterminate{position:absolute;width:30%;animation:dsh-cg-btn-slide 1.1s ease-in-out infinite}',
       '@keyframes dsh-cg-btn-slide{0%{left:-30%}100%{left:100%}}',
+      */
+      '.dsh-cg-refresh-btn{display:inline-flex;align-items:center;gap:5px;border:0;background:transparent}',
       '.dsh-cg-link:hover{border-color:var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}',
       '.dsh-cg-tree{display:flex;flex-direction:column;gap:10px}',
       '.dsh-cg-tree[data-loading="true"]{opacity:.55}',
@@ -4203,8 +4205,9 @@ window.__ModuleLoader__.load({
                   : h(
                       'span',
                       { className: 'dsh-cg-stats-actions' },
-                      /* While refreshing the button reports and visualises its own progress, so the
-                         count cannot drift away from it or fall back to a text-only hint. */
+                      /* The refresh is usually instant (nothing new to index), so a bar would flash
+                         and push the row around; the button alone reports the state. The bar markup
+                         is kept below, commented, for when the corpus is big enough to warrant it. */
                       h(
                         'button',
                         {
@@ -4214,10 +4217,8 @@ window.__ModuleLoader__.load({
                           onClick: refresh,
                         },
                         refreshingNow ? spinner('sm') : null,
-                        refreshingNow
-                          ? t('global.refreshing') +
-                            (build !== null && build.total > 0 ? ` ${build.done}/${build.total}` : '')
-                          : t('global.refresh'),
+                        refreshingNow ? t('global.refreshing') : t('global.refresh'),
+                        /*
                         refreshingNow
                           ? h(
                               'span',
@@ -4234,6 +4235,7 @@ window.__ModuleLoader__.load({
                               }),
                             )
                           : null,
+                        */
                       ),
                       h('button', { type: 'button', className: 'dsh-cg-link', onClick: expandAll }, t('expandAll')),
                       h('button', { type: 'button', className: 'dsh-cg-link', onClick: collapseAll }, t('collapseAll')),
