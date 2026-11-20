@@ -383,11 +383,10 @@ window.__ModuleLoader__.load({
       '.dsh-cg-page{display:flex;flex-direction:column;flex:1 1 auto;height:100%;min-height:0;overflow:hidden;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);font-size:var(--dsh-content-font-size-secondary,13px)}',
       '.dsh-cg-head{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;flex:none;width:100%;max-width:1080px;margin:0 auto;padding:28px 32px 0;box-sizing:border-box}',
       '.dsh-cg-head-text{min-width:0}',
-      '.dsh-cg-refresh-btn{display:inline-flex;align-items:center;gap:5px}',
-      /* Refresh progress lives in the flow, right-aligned under the actions row. */
-      '.dsh-cg-refresh-row{display:flex;flex-direction:column;align-items:flex-end;gap:4px;width:min(300px,72%);margin:2px 0 6px auto}',
-      '.dsh-cg-refresh-row .dsh-cg-progress{width:100%;margin:0;align-items:flex-end}',
-      '.dsh-cg-refresh-row .dsh-cg-progress-track{width:100%}',
+      '.dsh-cg-refresh-btn{position:relative;display:inline-flex;align-items:center;gap:5px;overflow:hidden}',
+      '.dsh-cg-btn-progress{position:absolute;left:0;bottom:0;height:2px;border-radius:2px;background:var(--dsw-alias-state-business-primary,#4f6ef7);transition:width .2s ease}',
+      '.dsh-cg-btn-progress--indeterminate{width:30%;animation:dsh-cg-btn-slide 1.1s ease-in-out infinite}',
+      '@keyframes dsh-cg-btn-slide{0%{left:-30%}100%{left:100%}}',
       '.dsh-cg-title{margin:0;font-size:calc(var(--dsh-content-font-size,14px) + 7px);font-weight:600;line-height:1.3}',
       '.dsh-cg-sub{margin:8px 0 0;color:var(--dsw-alias-label-secondary);line-height:1.6}',
       '.dsh-cg-bar{flex:none;display:flex;flex-direction:column;gap:10px;width:100%;max-width:1080px;margin:0 auto;padding:16px 32px 12px;box-sizing:border-box;border-bottom:.5px solid var(--dsw-alias-border-l1)}',
@@ -4201,6 +4200,8 @@ window.__ModuleLoader__.load({
                   : h(
                       'span',
                       { className: 'dsh-cg-stats-actions' },
+                      /* While refreshing the button reports and visualises its own progress, so the
+                         count cannot drift away from it or fall back to a text-only hint. */
                       h(
                         'button',
                         {
@@ -4210,26 +4211,27 @@ window.__ModuleLoader__.load({
                           onClick: refresh,
                         },
                         refreshingNow ? spinner('sm') : null,
-                        refreshingNow ? t('global.refreshing') : t('global.refresh'),
+                        refreshingNow
+                          ? t('global.refreshing') +
+                            (build !== null && build.total > 0 ? ` ${build.done}/${build.total}` : '')
+                          : t('global.refresh'),
+                        refreshingNow
+                          ? h('span', {
+                              className:
+                                build !== null && build.total > 0
+                                  ? 'dsh-cg-btn-progress'
+                                  : 'dsh-cg-btn-progress dsh-cg-btn-progress--indeterminate',
+                              style:
+                                build !== null && build.total > 0
+                                  ? { width: Math.min(100, Math.round((build.done / build.total) * 100)) + '%' }
+                                  : undefined,
+                            })
+                          : null,
                       ),
                       h('button', { type: 'button', className: 'dsh-cg-link', onClick: expandAll }, t('expandAll')),
                       h('button', { type: 'button', className: 'dsh-cg-link', onClick: collapseAll }, t('collapseAll')),
                     ),
               ),
-          /* In normal flow under the actions row — not a popover. */
-          refreshingNow
-            ? h(
-                'div',
-                { className: 'dsh-cg-refresh-row', role: 'status', 'aria-live': 'polite' },
-                buildBar !== null
-                  ? buildBar
-                  : h(
-                      'span',
-                      { className: 'dsh-cg-progress-text' },
-                      t('global.refreshingHint'),
-                    ),
-              )
-            : null,
           stats === null || sessions.length === 0 ? null : h('div', { className: 'dsh-cg-legend' }, t('global.legend')),
           firstBuild ? progressBlock : body,
         ),
