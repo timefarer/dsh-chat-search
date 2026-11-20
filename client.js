@@ -208,7 +208,8 @@ window.__ModuleLoader__.load({
       'jump.title': '正在跳到第 {turn} 轮…',
       'jump.hint': '正在定位并高亮命中内容',
       'global.legend': '▾ 展开 / 收起 　 点击段落即可跳转并高亮',
-      'global.refreshing': '正在重建索引…',
+      'global.refreshing': '正在刷新索引',
+      'global.refreshingHint': '正在建立索引…',
       'jump.label': '跳转',
       'jump.paraHint': '跳到这一段并高亮命中内容',
       'file.only': '文件',
@@ -314,7 +315,8 @@ window.__ModuleLoader__.load({
       'jump.title': 'Jumping to turn {turn}…',
       'jump.hint': 'Locating and highlighting the match',
       'global.legend': '▾ Expand / collapse 　 Click a paragraph to jump and highlight',
-      'global.refreshing': 'Rebuilding the index…',
+      'global.refreshing': 'Refreshing…',
+      'global.refreshingHint': 'Building the index…',
       'jump.label': 'Jump',
       'jump.paraHint': 'Jump to this paragraph and highlight the match',
       'file.only': 'File',
@@ -381,11 +383,11 @@ window.__ModuleLoader__.load({
       '.dsh-cg-page{display:flex;flex-direction:column;flex:1 1 auto;height:100%;min-height:0;overflow:hidden;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);font-size:var(--dsh-content-font-size-secondary,13px)}',
       '.dsh-cg-head{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;flex:none;width:100%;max-width:1080px;margin:0 auto;padding:28px 32px 0;box-sizing:border-box}',
       '.dsh-cg-head-text{min-width:0}',
-      '.dsh-cg-refresh-anchor{position:relative;display:inline-flex}',
-      /* A compact popover under the button, on one line, so it never reflows the actions row. */
-      '.dsh-cg-refresh{position:absolute;top:calc(100% + 6px);right:0;z-index:5;display:flex;flex-direction:column;align-items:flex-end;gap:4px;width:min(260px,44vw);padding:8px 10px;border:.5px solid var(--dsw-alias-border-l1);border-radius:10px;background:var(--dsw-alias-bg-layer-1,#fff);box-shadow:0 4px 14px rgba(0,0,0,.12);white-space:nowrap}',
-      '.dsh-cg-refresh .dsh-cg-progress{width:100%;margin:0;align-items:flex-end}',
-      '.dsh-cg-refresh .dsh-cg-progress-track{width:100%}',
+      '.dsh-cg-refresh-btn{display:inline-flex;align-items:center;gap:5px}',
+      /* Refresh progress lives in the flow, right-aligned under the actions row. */
+      '.dsh-cg-refresh-row{display:flex;flex-direction:column;align-items:flex-end;gap:4px;width:min(300px,72%);margin:2px 0 6px auto}',
+      '.dsh-cg-refresh-row .dsh-cg-progress{width:100%;margin:0;align-items:flex-end}',
+      '.dsh-cg-refresh-row .dsh-cg-progress-track{width:100%}',
       '.dsh-cg-title{margin:0;font-size:calc(var(--dsh-content-font-size,14px) + 7px);font-weight:600;line-height:1.3}',
       '.dsh-cg-sub{margin:8px 0 0;color:var(--dsw-alias-label-secondary);line-height:1.6}',
       '.dsh-cg-bar{flex:none;display:flex;flex-direction:column;gap:10px;width:100%;max-width:1080px;margin:0 auto;padding:16px 32px 12px;box-sizing:border-box;border-bottom:.5px solid var(--dsw-alias-border-l1)}',
@@ -4199,35 +4201,35 @@ window.__ModuleLoader__.load({
                   : h(
                       'span',
                       { className: 'dsh-cg-stats-actions' },
-                      /* Anchored wrapper: the progress popover hangs directly under 刷新索引. */
                       h(
-                        'span',
-                        { className: 'dsh-cg-refresh-anchor' },
-                        h(
-                          'button',
-                          {
-                            type: 'button',
-                            className: 'dsh-cg-link',
-                            disabled: refreshingNow,
-                            onClick: refresh,
-                          },
-                          t('global.refresh'),
-                        ),
-                        refreshingNow
-                          ? h(
-                              'div',
-                              { className: 'dsh-cg-refresh', role: 'status', 'aria-live': 'polite' },
-                              spinner('sm'),
-                              buildBar !== null
-                                ? buildBar
-                                : h('span', { className: 'dsh-cg-progress-text' }, t('global.building')),
-                            )
-                          : null,
+                        'button',
+                        {
+                          type: 'button',
+                          className: 'dsh-cg-link dsh-cg-refresh-btn',
+                          disabled: refreshingNow,
+                          onClick: refresh,
+                        },
+                        refreshingNow ? spinner('sm') : null,
+                        refreshingNow ? t('global.refreshing') : t('global.refresh'),
                       ),
                       h('button', { type: 'button', className: 'dsh-cg-link', onClick: expandAll }, t('expandAll')),
                       h('button', { type: 'button', className: 'dsh-cg-link', onClick: collapseAll }, t('collapseAll')),
                     ),
               ),
+          /* In normal flow under the actions row — not a popover. */
+          refreshingNow
+            ? h(
+                'div',
+                { className: 'dsh-cg-refresh-row', role: 'status', 'aria-live': 'polite' },
+                buildBar !== null
+                  ? buildBar
+                  : h(
+                      'span',
+                      { className: 'dsh-cg-progress-text' },
+                      t('global.refreshingHint'),
+                    ),
+              )
+            : null,
           stats === null || sessions.length === 0 ? null : h('div', { className: 'dsh-cg-legend' }, t('global.legend')),
           firstBuild ? progressBlock : body,
         ),
