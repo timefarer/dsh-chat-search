@@ -1591,6 +1591,29 @@ window.__ModuleLoader__.load({
       }
     }
 
+    /** Paint every visible match in the conversation, so a search shows its hits without a click. */
+    function highlightEverywhere(words) {
+      if (words.length === 0) return 0
+      if (typeof document === 'undefined' || typeof document.querySelectorAll !== 'function') return 0
+      let rows = []
+      try {
+        rows = Array.prototype.slice.call(document.querySelectorAll('[data-chat-node-key]'))
+      } catch (error) {
+        return 0
+      }
+      const ranges = []
+      for (const row of rows) {
+        if (!isVisible(row)) continue
+        for (const range of wordRanges(row, words)) {
+          ranges.push(range)
+          if (ranges.length >= 300) break
+        }
+        if (ranges.length >= 300) break
+      }
+      if (ranges.length === 0) return 0
+      return applyNativeHighlight(ranges) ? ranges.length : 0
+    }
+
     /** Native text highlight: the browser-find look, anchored to the text so it scrolls with it. */
     function applyNativeHighlight(ranges) {
       if (ranges.length === 0) return false
@@ -3108,12 +3131,16 @@ window.__ModuleLoader__.load({
         if (trimmed === '') {
           setResults(EMPTY_RESULTS)
           setError('')
+          clearNativeHighlight()
           return undefined
         }
         const timer = setTimeout(() => {
           try {
-            setResults(searchConversation(order, nodeStore, trimmed, filters, scope))
+            const results = searchConversation(order, nodeStore, trimmed, filters, scope)
+            setResults(results)
             setError('')
+            /* Search itself marks the hits; clicking a result still narrows it to that paragraph. */
+            if (results.total > 0) highlightEverywhere(normalizeWords(trimmed))
           } catch (failure) {
             console.error('[conversation-search] search failed', failure)
             setResults(EMPTY_RESULTS)

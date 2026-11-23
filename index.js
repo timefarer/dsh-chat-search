@@ -22,8 +22,9 @@ const MAX_BODY_BYTES = 128 * 1024
 const INDEX_TTL_MS = 30_000
 /** A hard floor between rebuilds, so a streaming reply cannot rebuild on every keystroke. */
 const INDEX_MIN_AGE_MS = 2_500
-/** A stored log has no cheap revision: its parsed entry is reused for this long between rebuilds. */
-const STORED_REUSE_MS = 10 * 60_000
+/** A stored log has no cheap revision: its parsed entry is reused for this long between rebuilds.
+    Kept equal to the index TTL so a finished Turn cannot stay invisible for minutes. */
+const STORED_REUSE_MS = 30_000
 /** Identical searches reuse their serialized result for this long. */
 const RESPONSE_TTL_MS = 60_000
 const MAX_RESPONSE_CACHE = 32
