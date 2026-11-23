@@ -4217,9 +4217,12 @@ window.__ModuleLoader__.load({
                   }),
                 ),
                 h('span', { className: 'dsh-cg-stats-text' }, t('global.indexed', { count: stats.indexed })),
-                /* Debug only: the numbers the next performance round has to move. */
                 debugEnabled()
-                  ? h('span', { className: 'dsh-cg-stats-text' }, `build ${stats.buildMs || 0}ms · match ${stats.matchMs || 0}ms · jump ${jumpTiming.lastMs}ms`)
+                  ? h(
+                      'span',
+                      { className: 'dsh-cg-stats-text' },
+                      `build ${stats.buildMs || 0}ms · match ${stats.matchMs || 0}ms · cache ${stats.cacheHits || 0}/${stats.cacheCandidates || 0} · jump ${jumpTiming.lastMs}ms`,
+                    )
                   : null,
                 h('span', { className: 'dsh-cg-stats-text' }, t('global.scopeHint.' + scope)),
                 h('span', { className: 'dsh-cg-stats-text' }, filtersSummary(t, filters)),

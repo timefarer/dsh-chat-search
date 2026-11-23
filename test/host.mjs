@@ -228,6 +228,11 @@ check(
   JSON.stringify(allValue.sessions[0].questions[0].paragraphs.map((p) => [p.kind, p.outputFiles])),
 )
 check('all: stats counted', allValue.stats.sessions === 1 && allValue.stats.questions === 2, JSON.stringify(allValue.stats))
+check(
+  'all: stats report the cache counters',
+  typeof allValue.stats.cacheHits === 'number' && typeof allValue.stats.cacheCandidates === 'number',
+  JSON.stringify({ hits: allValue.stats.cacheHits, candidates: allValue.stats.cacheCandidates }),
+)
 
 const sessionOnly = await post({ action: 'search', query: '侧边栏', scope: 'session' })
 check('session scope: only the title hit', sessionOnly.body.value.sessions.length === 1)

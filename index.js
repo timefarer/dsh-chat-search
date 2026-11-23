@@ -192,6 +192,9 @@ async function handleRequest(ctx, index, recent, filters, responseCache, req, re
         /* Index timing travels with every reply, cached or not: that is the number to optimise. */
         buildMs: index.buildMs(),
         indexAgeMs: Date.now() - index.builtAt(),
+        /* Diagnostic: how many persisted Sessions came from the on-disk cache in the last build. */
+        cacheHits: index.cache().hits,
+        cacheCandidates: index.cache().candidates,
       },
     }
     /* Recorded only after the search succeeded, so a failed request never enters history. */
@@ -631,6 +634,9 @@ function createIndex(ctx) {
   let building = null
   /* Monotonic across restarts, so a rebuilt corpus can never reuse an older response cache key. */
   let buildId = 0
+  /* Diagnostic counters for the last build: how many persisted Sessions had a usable cache entry. */
+  let cacheHits = 0
+  let cacheCandidates = 0
   /* Session counts for the first build, so the page can show a real progress bar instead of a
      spinner. `done` counts records handed to a batch, not records that parsed successfully. */
   let progress = { active: false, done: 0, total: 0 }
@@ -659,6 +665,8 @@ function createIndex(ctx) {
     /* Cheap revision source for persisted Sessions; empty when the log layout is unknown. */
     const diskSignatures = await scanSessionFiles()
     const pendingWrites = []
+    cacheHits = 0
+    cacheCandidates = 0
 
     for (let offset = 0; offset < records.length && offset < MAX_SESSIONS && budget > 0; offset += 8) {
       const batch = records.slice(offset, offset + 8)
@@ -677,8 +685,12 @@ function createIndex(ctx) {
             }
             const diskSignature = events === undefined ? diskSignatures.get(id) : undefined
             if (diskSignature !== undefined && !force) {
+              cacheCandidates += 1
               const cachedEntry = await readCachedEntry(id, diskSignature)
-              if (cachedEntry !== null) return cachedEntry
+              if (cachedEntry !== null) {
+                cacheHits += 1
+                return cachedEntry
+              }
             }
             const log = events === undefined ? (await query.readSession(id)).events : events
             const entry = parseSession(id, record.header, log, signature)
@@ -733,6 +745,7 @@ function createIndex(ctx) {
     builtAt: () => builtAt,
     buildMs: () => buildMs,
     buildId: () => buildId,
+    cache: () => ({ hits: cacheHits, candidates: cacheCandidates }),
     progress: () => progress,
     /** Read the current corpus state without triggering a build. */
     peek: () => ({ sessions: cache.size, builtAt, buildMs, buildId, progress }),
