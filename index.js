@@ -372,12 +372,12 @@ async function readBuildId() {
   }
 }
 
-async function writeBuildId(buildId, sessions, chars) {
+async function writeBuildId(buildId, sessions, chars, counts) {
   const target = path.join(dataDir(), 'index', 'meta.json')
   const temporary = `${target}.${process.pid}.tmp`
   try {
     await fsPromises.mkdir(path.dirname(target), { recursive: true })
-    await fsPromises.writeFile(temporary, JSON.stringify({ schema: CACHE_SCHEMA, buildId, sessions, chars }), 'utf8')
+    await fsPromises.writeFile(temporary, JSON.stringify({ schema: CACHE_SCHEMA, buildId, sessions, chars, counts }), 'utf8')
     await fsPromises.rename(temporary, target)
   } catch (error) {
     /* A missing counter only costs one cache miss after a restart. */
@@ -667,6 +667,8 @@ function createIndex(ctx) {
     const pendingWrites = []
     cacheHits = 0
     cacheCandidates = 0
+    let liveCount = 0
+    let storedCount = 0
 
     for (let offset = 0; offset < records.length && offset < MAX_SESSIONS && budget > 0; offset += 8) {
       const batch = records.slice(offset, offset + 8)
@@ -676,6 +678,8 @@ function createIndex(ctx) {
           try {
             const live = liveSessions === undefined ? undefined : liveSessions.get(id)
             const events = live === undefined ? undefined : live.snapshotEvents()
+            if (events === undefined) storedCount += 1
+            else liveCount += 1
             const signature = events === undefined ? 'stored' : `live:${events.length}`
             const hit = cache.get(id)
             if (hit !== undefined && hit.signature === signature) return hit
@@ -723,7 +727,7 @@ function createIndex(ctx) {
     builtAt = Date.now()
     buildMs = builtAt - buildStarted
     buildId = (await readBuildId()) + 1
-    await writeBuildId(buildId, cache.size, MAX_TOTAL_CHARS - budget)
+    await writeBuildId(buildId, cache.size, MAX_TOTAL_CHARS - budget, { live: liveCount, stored: storedCount, hits: cacheHits, candidates: cacheCandidates })
     return cache
   }
 
@@ -1222,6 +1226,25 @@ function searchCorpus(corpus, query, scope, started, filters) {
           })
         }
         if (!questionMatched && paragraphs.length === 0) continue
+        /* Text answers first: a Turn with many tool-only steps can otherwise fill the whole
+           paragraph budget with repeated file rows and hide the reply itself. */
+        const textRows = []
+        const fileRows = []
+        const seenFiles = new Set()
+        for (const row of paragraphs) {
+          if (row.kind !== 'file') {
+            textRows.push(row)
+            continue
+          }
+          const key = row.outputFiles.join('|')
+          if (seenFiles.has(key)) continue
+          seenFiles.add(key)
+          fileRows.push(row)
+        }
+        const capped = textRows.slice(0, MAX_RESULT_PARAGRAPHS)
+        if (capped.length < MAX_RESULT_PARAGRAPHS) {
+          capped.push(...fileRows.slice(0, MAX_RESULT_PARAGRAPHS - capped.length))
+        }
         questions.push({
           seq: questionSeq,
           number: questionNumber,
@@ -1232,7 +1255,7 @@ function searchCorpus(corpus, query, scope, started, filters) {
           inputFiles: questionFiles,
           matchedFiles,
           paragraphTotal: paragraphTotal,
-          paragraphs: paragraphs.slice(0, MAX_RESULT_PARAGRAPHS),
+          paragraphs: capped,
         })
         questionCount += 1
       }

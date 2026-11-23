@@ -535,6 +535,8 @@ window.__ModuleLoader__.load({
       '.dsh-cg-question-toggle:hover{background:var(--dsw-alias-bg-layer-2)}',
       '.dsh-cg-question-toggle:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-2px}',
       '.dsh-cg-q-tag{flex:none;color:var(--dsw-alias-brand-primary);font-size:11px;font-weight:600;white-space:nowrap}',
+      '.dsh-cg-role-tag{flex:none;padding:0 5px;border:.5px solid var(--dsw-alias-border-l1);border-radius:999px;color:var(--dsw-alias-label-secondary);font-size:11px;line-height:16px}',
+      '.dsh-cg-para-role{color:var(--dsw-alias-label-secondary);opacity:.85}',
       '.dsh-cg-q-text{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;line-height:1.5}',
       '.dsh-cg-paras{display:flex;flex-direction:column;gap:4px;padding:0 6px 8px}',
       '.dsh-cg-para{display:flex;flex-direction:column;gap:5px;width:100%;padding:8px 10px;border:.5px solid rgba(127,127,127,.28);border-radius:10px;background:var(--dsw-alias-bg-base);color:inherit;font:inherit;text-align:left;cursor:pointer;transition:background-color .12s ease,border-color .12s ease,box-shadow .12s ease}',
@@ -3843,6 +3845,8 @@ window.__ModuleLoader__.load({
           h(
             'span',
             { className: 'dsh-cg-para-meta' },
+            /* Same vocabulary as the panel: 回复 · 第 N 段 / 回复 · 文件. */
+            h('span', { className: 'dsh-cg-para-role' }, t('role.assistant')),
             h('span', null, fileOnly ? t('file.only') : t('global.paragraph.label', { index: paragraph.index })),
             typeof paragraph.hits === 'number' && paragraph.hits > 1
               ? h('span', { className: 'dsh-cg-para-hits' }, t('global.paragraph.hits', { count: paragraph.hits }))
@@ -3871,6 +3875,9 @@ window.__ModuleLoader__.load({
         const hidden = typeof question.paragraphTotal === 'number' ? question.paragraphTotal - paragraphs.length : 0
         const expandable = paragraphs.length > 0
         const label = h('span', { className: 'dsh-cg-q-tag' }, t('global.question.label', { number: question.number }))
+        /* The panel labels its groups 提问/回复; the page says the same thing so a file row's
+           origin is never ambiguous. */
+        const roleTag = h('span', { className: 'dsh-cg-role-tag' }, t('role.user'))
         const text = h(
           'span',
           { className: 'dsh-cg-q-text', title: question.text },
@@ -3891,6 +3898,7 @@ window.__ModuleLoader__.load({
                 ? spinner('sm')
                 : h(IconCaret, { className: 'dsh-cg-caret', open }),
               label,
+              roleTag,
               text,
             )
           : h(
@@ -3904,6 +3912,7 @@ window.__ModuleLoader__.load({
               },
               h('span', { className: 'dsh-cg-caret-space' }),
               label,
+              roleTag,
               text,
             )
         return h(
