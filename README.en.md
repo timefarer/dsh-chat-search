@@ -103,6 +103,19 @@ dsh plugin add link:<path-to-this-directory>
   `recent.json` (last 8 queries) and `filters.json` (the window). Nothing else.
 - Sends **no network requests**. The Host route rejects calls without the browser credential (401).
 
+### About the market's "network" badge
+
+The market's "What it can do" list comes from a **static scan**: any `fetch(` in the source marks the
+plugin as "network", without looking at where the request goes. This plugin's only call is
+**browser → its own Host route**:
+
+```
+page → POST /conversation-search/api  (same origin, loopback, browser credential required)
+```
+
+There are no external URLs, no telemetry, and no update checks. The badge means "can make a request",
+not "talks to the internet".
+
 ## Compatibility and limits
 
 - Targets DSH `>=0.2.0-rc.1`; uses the official `slots`, `sidebar`, `shortcuts`, `webServer`,
