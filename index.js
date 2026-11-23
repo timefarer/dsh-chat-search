@@ -169,7 +169,7 @@ async function handleRequest(ctx, index, recent, filters, responseCache, req, re
     }
     const corpus = await index.ensure(payload.refresh === true)
     /* An identical search inside the TTL reuses the folded result; the index version keys it. */
-    const cacheKey = `${index.builtAt()}|${query}|${scope}|${active.since}|${active.until}|${active.turns}`
+    const cacheKey = `${index.buildId()}|${query}|${scope}|${active.since}|${active.until}|${active.turns}`
     const cached = responseCache.get(cacheKey)
     const fresh = cached === undefined || Date.now() - cached.at >= RESPONSE_TTL_MS
     if (fresh) {
@@ -251,6 +251,134 @@ function dataDir() {
 /** The file this plugin's search history lives in. */
 function recentPath() {
   return path.join(dataDir(), RECENT_FILE)
+}
+
+/* ---- Index cache (P2) -------------------------------------------------- */
+
+/** Cache format version: a mismatch drops the file instead of trusting old shapes. */
+const CACHE_SCHEMA = 1
+
+/** Where DSH keeps the persisted Session logs (the only cheap revision source we have). */
+const SESSIONS_ROOT = path.join(os.homedir(), '.dsh', 'sessions')
+
+function indexDir() {
+  return path.join(dataDir(), 'index', 'v' + CACHE_SCHEMA)
+}
+
+function indexFilePath(id) {
+  return path.join(indexDir(), id + '.json')
+}
+
+/**
+ * Map every Session to the size/mtime of its log file.
+ *
+ * The log layout is a DSH internal detail: when nothing matches, the map stays empty and the
+ * caller simply rebuilds from `readSession()` — the cache is an optimisation, never a requirement.
+ */
+async function scanSessionFiles() {
+  const map = new Map()
+  let buckets = []
+  try {
+    buckets = await fsPromises.readdir(SESSIONS_ROOT, { withFileTypes: true })
+  } catch (error) {
+    return map
+  }
+  for (const bucket of buckets) {
+    if (!bucket.isDirectory()) continue
+    const bucketPath = path.join(SESSIONS_ROOT, bucket.name)
+    let sessions = []
+    try {
+      sessions = await fsPromises.readdir(bucketPath, { withFileTypes: true })
+    } catch (error) {
+      continue
+    }
+    for (const session of sessions) {
+      if (!session.isDirectory() || !session.name.startsWith('session-')) continue
+      const sessionPath = path.join(bucketPath, session.name)
+      let files = []
+      try {
+        files = await fsPromises.readdir(sessionPath, { withFileTypes: true })
+      } catch (error) {
+        continue
+      }
+      const log = files.find((file) => file.isFile() && file.name.startsWith('session'))
+      if (log === undefined) continue
+      try {
+        const stat = await fsPromises.stat(path.join(sessionPath, log.name))
+        map.set(session.name.slice('session-'.length), { size: stat.size, mtimeMs: Math.round(stat.mtimeMs) })
+      } catch (error) {
+        /* A file removed between readdir and stat just has no signature. */
+      }
+    }
+  }
+  return map
+}
+
+async function readCachedEntry(id, signature) {
+  try {
+    const parsed = JSON.parse(await fsPromises.readFile(indexFilePath(id), 'utf8'))
+    if (parsed === null || typeof parsed !== 'object' || parsed.schema !== CACHE_SCHEMA || parsed.id !== id) return null
+    const known = parsed.signature
+    if (known === null || typeof known !== 'object') return null
+    if (known.size !== signature.size || known.mtimeMs !== signature.mtimeMs) return null
+    return parsed.entry !== null && typeof parsed.entry === 'object' ? parsed.entry : null
+  } catch (error) {
+    return null
+  }
+}
+
+async function writeCachedEntry(id, signature, entry) {
+  const target = indexFilePath(id)
+  const temporary = `${target}.${process.pid}.tmp`
+  try {
+    await fsPromises.mkdir(indexDir(), { recursive: true })
+    await fsPromises.writeFile(temporary, JSON.stringify({ schema: CACHE_SCHEMA, id, signature, entry }), 'utf8')
+    await fsPromises.rename(temporary, target)
+    return true
+  } catch (error) {
+    return false
+  }
+}
+
+async function pruneCache(live) {
+  let files = []
+  try {
+    files = await fsPromises.readdir(indexDir())
+  } catch (error) {
+    return
+  }
+  for (const name of files) {
+    if (!name.endsWith('.json')) continue
+    const id = name.slice(0, -'.json'.length)
+    if (live.has(id)) continue
+    try {
+      await fsPromises.unlink(path.join(indexDir(), name))
+    } catch (error) {
+      /* A cache file that cannot be removed is harmless; the next build overwrites it. */
+    }
+  }
+}
+
+/** Monotonic build counter: a rebuilt index always gets a bigger id than the one it replaces. */
+async function readBuildId() {
+  try {
+    const parsed = JSON.parse(await fsPromises.readFile(path.join(dataDir(), 'index', 'meta.json'), 'utf8'))
+    return typeof parsed.buildId === 'number' && Number.isFinite(parsed.buildId) ? parsed.buildId : 0
+  } catch (error) {
+    return 0
+  }
+}
+
+async function writeBuildId(buildId, sessions, chars) {
+  const target = path.join(dataDir(), 'index', 'meta.json')
+  const temporary = `${target}.${process.pid}.tmp`
+  try {
+    await fsPromises.mkdir(path.dirname(target), { recursive: true })
+    await fsPromises.writeFile(temporary, JSON.stringify({ schema: CACHE_SCHEMA, buildId, sessions, chars }), 'utf8')
+    await fsPromises.rename(temporary, target)
+  } catch (error) {
+    /* A missing counter only costs one cache miss after a restart. */
+  }
 }
 
 /**
@@ -501,6 +629,8 @@ function createIndex(ctx) {
   let builtAt = 0
   let buildMs = 0
   let building = null
+  /* Monotonic across restarts, so a rebuilt corpus can never reuse an older response cache key. */
+  let buildId = 0
   /* Session counts for the first build, so the page can show a real progress bar instead of a
      spinner. `done` counts records handed to a batch, not records that parsed successfully. */
   let progress = { active: false, done: 0, total: 0 }
@@ -526,6 +656,9 @@ function createIndex(ctx) {
     const next = new Map()
     let budget = MAX_TOTAL_CHARS
     if (force) stored.clear()
+    /* Cheap revision source for persisted Sessions; empty when the log layout is unknown. */
+    const diskSignatures = await scanSessionFiles()
+    const pendingWrites = []
 
     for (let offset = 0; offset < records.length && offset < MAX_SESSIONS && budget > 0; offset += 8) {
       const batch = records.slice(offset, offset + 8)
@@ -542,9 +675,17 @@ function createIndex(ctx) {
             if (events === undefined && kept !== undefined && Date.now() - kept.at < STORED_REUSE_MS) {
               return kept.entry
             }
+            const diskSignature = events === undefined ? diskSignatures.get(id) : undefined
+            if (diskSignature !== undefined && !force) {
+              const cachedEntry = await readCachedEntry(id, diskSignature)
+              if (cachedEntry !== null) return cachedEntry
+            }
             const log = events === undefined ? (await query.readSession(id)).events : events
             const entry = parseSession(id, record.header, log, signature)
-            if (events === undefined) stored.set(id, { entry, at: Date.now() })
+            if (events === undefined) {
+              stored.set(id, { entry, at: Date.now() })
+              if (diskSignature !== undefined) pendingWrites.push({ id, diskSignature, entry })
+            }
             return entry
           } catch (error) {
             return undefined
@@ -561,11 +702,16 @@ function createIndex(ctx) {
       }
     }
 
+    for (const item of pendingWrites) await writeCachedEntry(item.id, item.diskSignature, item.entry)
+    if (diskSignatures.size > 0) await pruneCache(next)
+
     progress = { active: false, done: progress.total, total: progress.total }
     cache.clear()
     for (const [id, entry] of next) cache.set(id, entry)
     builtAt = Date.now()
     buildMs = builtAt - buildStarted
+    buildId = (await readBuildId()) + 1
+    await writeBuildId(buildId, cache.size, MAX_TOTAL_CHARS - budget)
     return cache
   }
 
@@ -586,9 +732,10 @@ function createIndex(ctx) {
     },
     builtAt: () => builtAt,
     buildMs: () => buildMs,
+    buildId: () => buildId,
     progress: () => progress,
     /** Read the current corpus state without triggering a build. */
-    peek: () => ({ sessions: cache.size, builtAt, buildMs, progress }),
+    peek: () => ({ sessions: cache.size, builtAt, buildMs, buildId, progress }),
   }
 }
 
