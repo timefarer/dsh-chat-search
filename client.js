@@ -192,6 +192,7 @@ window.__ModuleLoader__.load({
       'global.paragraph.label': '第 {index} 段',
       'global.paragraph.hits': '{count} 处',
       'global.paragraph.more': '还有 {count} 段未显示',
+      'global.paragraph.loadAll': '显示全部 {count} 段',
       'global.file.input': '输入',
       'global.file.output': '输出',
       'global.jumpFailed': '该段落暂未加载，请打开会话后再定位',
@@ -299,6 +300,7 @@ window.__ModuleLoader__.load({
       'global.paragraph.label': 'Paragraph {index}',
       'global.paragraph.hits': '{count} hits',
       'global.paragraph.more': '{count} more paragraphs not shown',
+      'global.paragraph.loadAll': 'Show all {count}',
       'global.file.input': 'in',
       'global.file.output': 'out',
       'global.jumpFailed': 'That paragraph is not loaded yet; open the session and try again',
@@ -412,6 +414,9 @@ window.__ModuleLoader__.load({
       '.dsh-cg-go svg,.dsh-csearch-go svg{display:block}',
       '.dsh-cg-jump-btn{display:inline-flex;align-items:center;justify-content:center;flex:none;height:22px;padding:0 6px;border:.5px solid var(--dsw-alias-border-l1);border-radius:999px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:11px;cursor:pointer}',
       '.dsh-cg-jump-btn:hover{border-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-brand-primary)}',
+      '.dsh-cg-more{cursor:pointer;border:.5px solid var(--dsw-alias-border-l1);background:transparent;color:var(--dsw-alias-brand-primary);font:inherit;font-size:11px;border-radius:999px;padding:0 6px;height:18px}',
+      '.dsh-cg-more:hover:not(:disabled){border-color:var(--dsw-alias-brand-primary)}',
+      '.dsh-cg-more:disabled{opacity:.5;cursor:default}',
       '.dsh-cg-legend{padding:0 2px 8px;color:var(--dsw-alias-label-secondary);font-size:11px;opacity:.85}',
       '.dsh-cg-spinner-sm{width:11px;height:11px;border-width:1.5px;margin-right:5px;vertical-align:-1px}',
       '.dsh-spin{flex:none;color:var(--dsw-alias-brand-primary);animation:dsh-cg-spin .9s linear infinite}',
@@ -2513,10 +2518,11 @@ window.__ModuleLoader__.load({
     }
 
     /** Ask the Host for one page of global results; `refresh` forces a corpus rebuild. */
-    function fetchGlobalSearch(query, scope, signal, refresh, filters) {
+    function fetchGlobalSearch(query, scope, signal, refresh, filters, paragraphCap) {
       const body = { action: 'search', query, scope }
       if (refresh === true) body.refresh = true
       if (filters !== undefined) body.filters = filters
+      if (paragraphCap !== undefined) body.paragraphCap = paragraphCap
       return postGlobal(body, signal)
     }
 
@@ -3867,12 +3873,38 @@ window.__ModuleLoader__.load({
         )
       }
 
+      /* "Show all" rows for one question, keyed session:seq; filled by a wider-capped request. */
+      const [moreRows, setMoreRows] = useState({})
+      const [moreBusy, setMoreBusy] = useState('')
+      const loadAllRows = useCallback(
+        (session, question) => {
+          const key = session.id + ':' + question.seq
+          setMoreBusy(key)
+          fetchGlobalSearch(query.trim(), scope, undefined, false, filters, 50).then(
+            (value) => {
+              const found = Array.isArray(value.sessions) ? value.sessions.find((item) => item.id === session.id) : undefined
+              const hit = found === undefined ? undefined : (found.questions || []).find((item) => item.seq === question.seq)
+              if (hit !== undefined) setMoreRows((current) => ({ ...current, [key]: Array.isArray(hit.paragraphs) ? hit.paragraphs : [] }))
+              setMoreBusy('')
+            },
+            () => setMoreBusy(''),
+          )
+        },
+        [query, scope, filters],
+      )
+
       const questionBlock = (session, question) => {
         const openKey = 'q:' + session.id + ':' + question.seq
         const open = expanded.has(openKey)
-        const paragraphs = Array.isArray(question.paragraphs) ? question.paragraphs : []
+        const moreKey = session.id + ':' + question.seq
+        const baseParagraphs = Array.isArray(question.paragraphs) ? question.paragraphs : []
+        const paragraphs = Array.isArray(moreRows[moreKey]) ? moreRows[moreKey] : baseParagraphs
         const inputFiles = Array.isArray(question.inputFiles) ? question.inputFiles : []
-        const hidden = typeof question.paragraphTotal === 'number' ? question.paragraphTotal - paragraphs.length : 0
+        const matchedTotal =
+          (typeof question.paragraphTotal === 'number' ? question.paragraphTotal : 0) +
+          (typeof question.fileTotal === 'number' ? question.fileTotal : 0)
+        const hidden = Math.max(0, matchedTotal - paragraphs.length)
+        const shownAll = moreRows[moreKey] !== undefined
         const expandable = paragraphs.length > 0
         const label = h('span', { className: 'dsh-cg-q-tag' }, t('global.question.label', { number: question.number }))
         /* The panel labels its groups 提问/回复; the page says the same thing so a file row's
@@ -3922,7 +3954,22 @@ window.__ModuleLoader__.load({
             'div',
             { className: 'dsh-cg-question-row' },
             head,
-            hidden > 0 ? h('span', { className: 'dsh-cg-hits' }, t('global.paragraph.more', { count: hidden })) : null,
+            hidden > 0
+              ? shownAll
+                ? h('span', { className: 'dsh-cg-hits' }, t('global.paragraph.more', { count: hidden }))
+                : h(
+                    'button',
+                    {
+                      type: 'button',
+                      className: 'dsh-cg-hits dsh-cg-more',
+                      disabled: moreBusy === moreKey,
+                      onClick: () => loadAllRows(session, question),
+                    },
+                    moreBusy === moreKey
+                      ? t('global.loading')
+                      : t('global.paragraph.loadAll', { count: hidden }),
+                  )
+              : null,
             expandable
               ? null
               : h(

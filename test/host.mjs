@@ -323,6 +323,11 @@ check(
 const refreshed = await post({ action: 'search', query: '侧边栏', scope: 'all', refresh: true })
 check('refresh rebuilds and answers', refreshed.status === 200 && refreshed.body.ok === true)
 
+/* A wider paragraph cap serves the "show all" click without a second endpoint. */
+const capped = await post({ action: 'search', query: '侧边栏', scope: 'all', paragraphCap: 1 })
+const cappedRows = capped.body.value.sessions[0].questions[0].paragraphs
+check('paragraphCap bounds the returned rows', cappedRows.length <= 1, String(cappedRows.length))
+
 /* The page polls status while the first build runs; it must report session counts. */
 const statusNow = await post({ action: 'status' })
 const statusValue = statusNow.body.value

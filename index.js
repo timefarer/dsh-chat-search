@@ -167,13 +167,17 @@ async function handleRequest(ctx, index, recent, filters, responseCache, req, re
       sendJson(res, 200, { ok: true, value })
       return
     }
+    const paragraphCap =
+      typeof payload.paragraphCap === 'number' && Number.isFinite(payload.paragraphCap)
+        ? Math.min(50, Math.max(1, Math.floor(payload.paragraphCap)))
+        : MAX_RESULT_PARAGRAPHS
     const corpus = await index.ensure(payload.refresh === true)
     /* An identical search inside the TTL reuses the folded result; the index version keys it. */
-    const cacheKey = `${index.buildId()}|${query}|${scope}|${active.since}|${active.until}|${active.turns}`
+    const cacheKey = `${index.buildId()}|${query}|${scope}|${active.since}|${active.until}|${active.turns}|${paragraphCap}`
     const cached = responseCache.get(cacheKey)
     const fresh = cached === undefined || Date.now() - cached.at >= RESPONSE_TTL_MS
     if (fresh) {
-      const computed = searchCorpus(corpus, query, scope, started, active)
+      const computed = searchCorpus(corpus, query, scope, started, active, paragraphCap)
       responseCache.set(cacheKey, { at: Date.now(), value: computed })
       if (responseCache.size > MAX_RESPONSE_CACHE) {
         const oldest = responseCache.keys().next().value
@@ -1149,7 +1153,8 @@ function emptyResult(query, scope, started) {
  * Every returned Session keeps only the questions and paragraphs that matched (plus the
  * containers needed to place them), each flagged with which layer actually hit the keywords.
  */
-function searchCorpus(corpus, query, scope, started, filters) {
+function searchCorpus(corpus, query, scope, started, filters, paragraphCap) {
+  const cap = typeof paragraphCap === 'number' && Number.isFinite(paragraphCap) ? Math.min(50, Math.max(1, Math.floor(paragraphCap))) : MAX_RESULT_PARAGRAPHS
   const matchStarted = Date.now()
   const words = normalizeWords(query)
   const spec = SCOPES[scope]
@@ -1241,9 +1246,9 @@ function searchCorpus(corpus, query, scope, started, filters) {
           seenFiles.add(key)
           fileRows.push(row)
         }
-        const capped = textRows.slice(0, MAX_RESULT_PARAGRAPHS)
-        if (capped.length < MAX_RESULT_PARAGRAPHS) {
-          capped.push(...fileRows.slice(0, MAX_RESULT_PARAGRAPHS - capped.length))
+        const capped = textRows.slice(0, cap)
+        if (capped.length < cap) {
+          capped.push(...fileRows.slice(0, cap - capped.length))
         }
         questions.push({
           seq: questionSeq,
@@ -1254,7 +1259,8 @@ function searchCorpus(corpus, query, scope, started, filters) {
           textMatched: partTextHit !== undefined,
           inputFiles: questionFiles,
           matchedFiles,
-          paragraphTotal: paragraphTotal,
+          paragraphTotal: textRows.length,
+          fileTotal: fileRows.length,
           paragraphs: capped,
         })
         questionCount += 1
