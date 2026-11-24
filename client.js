@@ -181,6 +181,7 @@ window.__ModuleLoader__.load({
       'global.retry': '重试',
       'global.stats': '{sessions} 个会话 · {questions} 个问题 · {paragraphs} 个段落 · {ms}ms',
       'global.indexed': '已索引 {count} 个会话',
+      'global.cache': '缓存 {hits}/{candidates}',
       'global.truncated': '结果较多，仅显示前 {count} 个会话',
       'global.untitled': '（无标题会话）',
       'global.session.matched': '标题命中',
@@ -289,6 +290,7 @@ window.__ModuleLoader__.load({
       'global.retry': 'Retry',
       'global.stats': '{sessions} sessions · {questions} questions · {paragraphs} paragraphs · {ms}ms',
       'global.indexed': '{count} sessions indexed',
+      'global.cache': 'cache {hits}/{candidates}',
       'global.truncated': 'Showing the first {count} sessions',
       'global.untitled': '(untitled session)',
       'global.session.matched': 'title match',
@@ -4278,11 +4280,18 @@ window.__ModuleLoader__.load({
                 ),
                 h('span', { className: 'dsh-cg-stats-divider', 'aria-hidden': 'true' }),
                 h('span', { className: 'dsh-cg-stats-text dsh-cg-stats-meta' }, t('global.indexed', { count: stats.indexed })),
+                typeof stats.cacheCandidates === 'number' && stats.cacheCandidates > 0
+                  ? h(
+                      'span',
+                      { className: 'dsh-cg-stats-text dsh-cg-stats-meta' },
+                      t('global.cache', { hits: stats.cacheHits || 0, candidates: stats.cacheCandidates }),
+                    )
+                  : null,
                 debugEnabled()
                   ? h(
                       'span',
                       { className: 'dsh-cg-stats-text dsh-cg-stats-meta' },
-                      `build ${stats.buildMs || 0}ms · match ${stats.matchMs || 0}ms · cache ${stats.cacheHits || 0}/${stats.cacheCandidates || 0} · jump ${jumpTiming.lastMs}ms`,
+                      `build ${stats.buildMs || 0}ms · match ${stats.matchMs || 0}ms · jump ${jumpTiming.lastMs}ms`,
                     )
                   : null,
                 h(
