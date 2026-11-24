@@ -414,7 +414,7 @@ window.__ModuleLoader__.load({
       '.dsh-cg-go svg,.dsh-csearch-go svg{display:block}',
       '.dsh-cg-jump-btn{display:inline-flex;align-items:center;justify-content:center;flex:none;height:22px;padding:0 6px;border:.5px solid var(--dsw-alias-border-l1);border-radius:999px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:11px;cursor:pointer}',
       '.dsh-cg-jump-btn:hover{border-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-brand-primary)}',
-      '.dsh-cg-more{cursor:pointer;border:.5px solid var(--dsw-alias-border-l1);background:transparent;color:var(--dsw-alias-brand-primary);font:inherit;font-size:11px;border-radius:999px;padding:0 6px;height:18px}',
+      '.dsh-cg-more{display:inline-flex;align-items:center;gap:4px;height:20px;line-height:1;cursor:pointer;border:.5px solid var(--dsw-alias-border-l1);background:transparent;color:var(--dsw-alias-brand-primary);font:inherit;font-size:11px;border-radius:999px;padding:0 8px}',
       '.dsh-cg-more:hover:not(:disabled){border-color:var(--dsw-alias-brand-primary)}',
       '.dsh-cg-more:disabled{opacity:.5;cursor:default}',
       '.dsh-cg-legend{padding:0 2px 8px;color:var(--dsw-alias-label-secondary);font-size:11px;opacity:.85}',
@@ -475,7 +475,11 @@ window.__ModuleLoader__.load({
 
     /** Result-tree rules, loaded after the base sheet so they refine the older boxes. */
     const CSS_RESULTS = [
-      '.dsh-cg-stats{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 2px 10px;color:var(--dsw-alias-label-secondary);font-size:12px}',
+      '.dsh-cg-stats{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 2px 10px;color:var(--dsw-alias-label-secondary);font-size:12px}',
+      /* Result numbers are the answer; index/scope/filter facts are context: give them a divider. */
+      '.dsh-cg-stats-primary{color:var(--dsw-alias-label-primary);font-weight:600}',
+      '.dsh-cg-stats-divider{width:1px;height:12px;background:var(--dsw-alias-border-l2);flex:none}',
+      '.dsh-cg-stats-meta{opacity:.85}',
       '.dsh-cg-stats-text{white-space:nowrap}',
       '.dsh-filters{display:flex;align-items:center;gap:8px;flex-wrap:wrap}',
       '.dsh-filter-title{color:var(--dsw-alias-label-secondary);font-size:12px}',
@@ -3966,7 +3970,7 @@ window.__ModuleLoader__.load({
                       onClick: () => loadAllRows(session, question),
                     },
                     moreBusy === moreKey
-                      ? t('global.loading')
+                      ? [spinner('sm'), t('global.loading')]
                       : t('global.paragraph.loadAll', { count: hidden }),
                   )
               : null,
@@ -4072,7 +4076,7 @@ window.__ModuleLoader__.load({
       /* One element tree per (result, expansion): status pulses and typing never rebuild it. */
       const tree = useMemo(
         () => (result === null ? null : (Array.isArray(result.sessions) ? result.sessions : []).map((session) => sessionBlock(session))),
-        [result, expanded, resultWords, openTarget],
+        [result, expanded, resultWords, openTarget, moreRows, moreBusy, loadAllRows],
       )
 
       const progressPercent =
@@ -4264,7 +4268,7 @@ window.__ModuleLoader__.load({
                 { className: 'dsh-cg-stats' },
                 h(
                   'span',
-                  { className: 'dsh-cg-stats-text' },
+                  { className: 'dsh-cg-stats-text dsh-cg-stats-primary' },
                   t('global.stats', {
                     sessions: stats.sessions,
                     questions: stats.questions,
@@ -4272,20 +4276,23 @@ window.__ModuleLoader__.load({
                     ms: stats.tookMs,
                   }),
                 ),
-                h('span', { className: 'dsh-cg-stats-text' }, t('global.indexed', { count: stats.indexed })),
+                h('span', { className: 'dsh-cg-stats-divider', 'aria-hidden': 'true' }),
+                h('span', { className: 'dsh-cg-stats-text dsh-cg-stats-meta' }, t('global.indexed', { count: stats.indexed })),
                 debugEnabled()
                   ? h(
                       'span',
-                      { className: 'dsh-cg-stats-text' },
+                      { className: 'dsh-cg-stats-text dsh-cg-stats-meta' },
                       `build ${stats.buildMs || 0}ms · match ${stats.matchMs || 0}ms · cache ${stats.cacheHits || 0}/${stats.cacheCandidates || 0} · jump ${jumpTiming.lastMs}ms`,
                     )
                   : null,
-                h('span', { className: 'dsh-cg-stats-text' }, t('global.scopeHint.' + scope)),
-                h('span', { className: 'dsh-cg-stats-text' }, filtersSummary(t, filters)),
+                h('span', { className: 'dsh-cg-stats-text dsh-cg-stats-meta' }, t('global.scopeHint.' + scope)),
+                h('span', { className: 'dsh-cg-stats-text dsh-cg-stats-meta' }, filtersSummary(t, filters)),
                 status === 'loading' && !refreshing
                   ? h('span', { className: 'dsh-cg-pulse' }, spinner('sm'), t('global.loading'))
                   : null,
-                stats.truncated ? h('span', { className: 'dsh-cg-stats-text' }, t('global.truncated', { count: stats.sessions })) : null,
+                stats.truncated
+                  ? h('span', { className: 'dsh-cg-stats-text dsh-cg-stats-meta' }, t('global.truncated', { count: stats.sessions }))
+                  : null,
                 sessions.length === 0
                   ? null
                   : h(
