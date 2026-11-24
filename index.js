@@ -731,7 +731,14 @@ function createIndex(ctx) {
     builtAt = Date.now()
     buildMs = builtAt - buildStarted
     buildId = (await readBuildId()) + 1
-    await writeBuildId(buildId, cache.size, MAX_TOTAL_CHARS - budget, { live: liveCount, stored: storedCount, hits: cacheHits, candidates: cacheCandidates })
+    await writeBuildId(buildId, cache.size, MAX_TOTAL_CHARS - budget, {
+      live: liveCount,
+      stored: storedCount,
+      hits: cacheHits,
+      candidates: cacheCandidates,
+      disk: diskSignatures.size,
+      root: SESSIONS_ROOT,
+    })
     return cache
   }
 

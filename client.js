@@ -4285,7 +4285,11 @@ window.__ModuleLoader__.load({
                       `build ${stats.buildMs || 0}ms · match ${stats.matchMs || 0}ms · cache ${stats.cacheHits || 0}/${stats.cacheCandidates || 0} · jump ${jumpTiming.lastMs}ms`,
                     )
                   : null,
-                h('span', { className: 'dsh-cg-stats-text dsh-cg-stats-meta' }, t('global.scopeHint.' + scope)),
+                h(
+                  'span',
+                  { className: 'dsh-cg-stats-text dsh-cg-stats-meta' },
+                  t('global.scopeHint.' + (scope === 'session-question' ? 'sessionQuestion' : scope)),
+                ),
                 h('span', { className: 'dsh-cg-stats-text dsh-cg-stats-meta' }, filtersSummary(t, filters)),
                 status === 'loading' && !refreshing
                   ? h('span', { className: 'dsh-cg-pulse' }, spinner('sm'), t('global.loading'))
