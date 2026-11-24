@@ -312,7 +312,9 @@ async function scanSessionFiles() {
       if (log === undefined) continue
       try {
         const stat = await fsPromises.stat(path.join(sessionPath, log.name))
-        map.set(session.name.slice('session-'.length), { size: stat.size, mtimeMs: Math.round(stat.mtimeMs) })
+        /* The log's own `id` carries the `session-` prefix and equals `header.id`; the directory
+           name is that same string, so key by it. */
+        map.set(session.name, { size: stat.size, mtimeMs: Math.round(stat.mtimeMs) })
       } catch (error) {
         /* A file removed between readdir and stat just has no signature. */
       }
@@ -691,7 +693,12 @@ function createIndex(ctx) {
             if (events === undefined && kept !== undefined && Date.now() - kept.at < STORED_REUSE_MS) {
               return kept.entry
             }
-            const diskSignature = events === undefined ? diskSignatures.get(id) : undefined
+            const diskSignature =
+              events === undefined
+                ? diskSignatures.get(id) ||
+                  diskSignatures.get('session-' + id) ||
+                  diskSignatures.get(id.replace(/^session-/, ''))
+                : undefined
             if (diskSignature !== undefined && !force) {
               cacheCandidates += 1
               const cachedEntry = await readCachedEntry(id, diskSignature)
